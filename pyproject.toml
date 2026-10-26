@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kerneltrace"
+version = "0.2.0"
+description = "Falsification-first experiments for mechanistic interpretability claims"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Pawan Kalyan" }]
+dependencies = [
+    "torch>=2.4",
+    "transformers>=4.48,<5",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=14",
+    "scipy>=1.11",
+    "pydantic>=2.5",
+    "pyyaml>=6",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+kerneltrace = "kerneltrace.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["kerneltrace*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: needs a CUDA device",
+    "network: downloads model weights from the Hugging Face hub",
+]

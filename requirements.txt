@@ -1,5 +1,12 @@
-# Install PyTorch CUDA build for your machine from https://pytorch.org/get-started/locally/ first.
+# Install a CUDA build of PyTorch for your GPU first, e.g. for RTX 50-series (Blackwell):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# then: pip install -e ".[dev]"   (or pip install -r requirements.txt)
 transformers>=4.48,<5
 numpy>=1.24
+pandas>=2.0
+pyarrow>=14
+scipy>=1.11
+pydantic>=2.5
+pyyaml>=6
 matplotlib>=3.7
 pytest>=8
