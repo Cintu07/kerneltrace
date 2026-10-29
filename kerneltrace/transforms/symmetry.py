@@ -1,0 +1,96 @@
+"""Function-preserving MLP channel permutations.
+
+Permuting an MLP's hidden channels, and applying the inverse permutation to
+the down projection, leaves the network's function unchanged in exact
+arithmetic because the nonlinearity is elementwise. In floating point the
+down-projection sums run in a different order, so output parity is measured
+rather than assumed, and nothing is compared until parity passes.
+
+The permutation is returned as an explicit component map. A neuron-level
+claim about "neuron 1234" is only meaningful through that map.
+"""
+from __future__ import annotations
+
+import copy
+from dataclasses import dataclass
+
+import numpy as np
+import torch
+
+from ..models.adapter import ModelAdapter, wrap
+
+
+@dataclass
+class PermutedModel:
+    adapter: ModelAdapter
+    perms: dict[int, torch.Tensor]  # layer -> perm; transformed j == original perm[j]
+
+    def to_original(self, layer: int, transformed: torch.Tensor) -> torch.Tensor:
+        return self.perms[layer].to(transformed.device)[transformed]
+
+    def to_transformed(self, layer: int, original: torch.Tensor) -> torch.Tensor:
+        inverse = torch.argsort(self.perms[layer])
+        return inverse.to(original.device)[original]
+
+
+def random_permutations(n_layers: int, d_mlp: int, seed: int) -> dict[int, torch.Tensor]:
+    g = torch.Generator().manual_seed(seed)
+    return {layer: torch.randperm(d_mlp, generator=g) for layer in range(n_layers)}
+
+
+def permuted_copy(adapter: ModelAdapter, perms: dict[int, torch.Tensor]) -> PermutedModel:
+    clone = wrap(copy.deepcopy(adapter.model))
+    for layer, perm in perms.items():
+        if sorted(perm.tolist()) != list(range(adapter.d_mlp)):
+            raise ValueError(f"layer {layer}: not a permutation of {adapter.d_mlp} channels")
+        clone.permute_mlp(layer, perm)
+    return PermutedModel(clone, perms)
+
+
+@dataclass
+class Parity:
+    max_abs_logit_diff: float
+    mean_abs_logit_diff: float
+    max_kl: float
+    argmax_agreement: float
+    atol: float
+
+    @property
+    def passed(self) -> bool:
+        return self.max_abs_logit_diff <= self.atol and self.argmax_agreement == 1.0
+
+
+def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float) -> Parity:
+    """Compare two [B, V] (or [B, T, V]) logit tensors over the full vocabulary."""
+    a = a.double().reshape(-1, a.shape[-1])
+    b = b.double().reshape(-1, b.shape[-1])
+    diff = (a - b).abs()
+    la, lb = torch.log_softmax(a, -1), torch.log_softmax(b, -1)
+    kl = (la.exp() * (la - lb)).sum(-1)
+    return Parity(
+        max_abs_logit_diff=float(diff.max()),
+        mean_abs_logit_diff=float(diff.mean()),
+        max_kl=float(kl.max()),
+        argmax_agreement=float((a.argmax(-1) == b.argmax(-1)).double().mean()),
+        atol=atol,
+    )
+
+
+def mapped_comparison(original_scores: np.ndarray, transformed_scores: np.ndarray,
+                      perm: torch.Tensor) -> dict:
+    """Compare per-channel scores with and without the component map.
+
+    original_scores[i] is channel i in the original model; transformed_scores[j]
+    is channel j in the permuted model, which corresponds to original perm[j].
+    """
+    from scipy.stats import spearmanr
+
+    p = perm.cpu().numpy()
+    mapped = original_scores[p]
+    naive = original_scores
+    return {
+        "mapped_spearman": float(spearmanr(mapped, transformed_scores).statistic),
+        "mapped_max_abs_diff": float(np.abs(mapped - transformed_scores).max()),
+        "naive_spearman": float(spearmanr(naive, transformed_scores).statistic),
+        "naive_max_abs_diff": float(np.abs(naive - transformed_scores).max()),
+    }
