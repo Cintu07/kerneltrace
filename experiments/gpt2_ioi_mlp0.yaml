@@ -1,0 +1,51 @@
+experiment_id: gpt2_ioi_mlp0
+claim: claims/gpt2_ioi_mlp0_extended_embedding.yaml
+model: openai-community/gpt2
+model_revision: 607a30d783dfa663caf39e06633721c8d4cfcd7e
+device: auto
+dtype: float32
+attn_implementation: eager
+seed: 0
+deterministic: true
+
+task:
+  n_discovery: 160
+  n_holdout: 160
+  min_contrast: 1.0
+  require_corrupt_flip: true
+  min_valid: 30
+  batch_size: 16
+  max_seq_len: 48
+
+baseline:
+  identity_controls: true
+  random_circuit_controls: 20
+  bootstrap: 2000
+  fidelity_top_k: 3
+
+challenges:
+  numerical:
+    reference: {name: eager_fp32, attn_implementation: eager, dtype: float32}
+    effect_atol: 1.0e-4
+    effect_rtol: 1.0e-3
+    conditions:
+      - {name: eager_fp32_repeat, attn_implementation: eager}
+      - {name: sdpa_fp32_default, attn_implementation: sdpa}
+      - {name: sdpa_fp32_math, attn_implementation: sdpa, sdpa_kernel: math}
+      - {name: sdpa_fp32_efficient, attn_implementation: sdpa, sdpa_kernel: efficient}
+      - {name: sdpa_fp32_flash, attn_implementation: sdpa, sdpa_kernel: flash}
+      - {name: eager_fp32_bs1, attn_implementation: eager, batch_size: 1}
+      - {name: eager_fp32_tf32, attn_implementation: eager, tf32: true}
+      - {name: eager_bf16, attn_implementation: eager, dtype: bfloat16}
+      - {name: eager_fp16, attn_implementation: eager, dtype: float16}
+  symmetry:
+    seed: 1
+    parity_atol: 1.0e-3
+    neuron_layers: [0, 10]
+    top_k_neurons: 20
+    n_cases: 48
+  counterexamples:
+    budget_forwards: 900
+    seeds: [0, 1, 2, 3, 4]
+    strategies: [random, coverage, guided]
+    slice_cases: 30

@@ -1,0 +1,57 @@
+# Pre-registered before any GPT-2 measurement was taken with this code.
+# Thresholds below are fixed here and must not be edited after seeing results;
+# a revised claim gets a new claim_id.
+claim_id: gpt2_ioi_mlp0_extended_embedding_v1
+hypothesis: >-
+  In GPT-2 small on IOI with an S2-flip corruption, MLP block 0 acts as an
+  extended token embedding. Restoring its clean output at every position
+  carries the second-subject identity forward and restores most of the
+  answer-minus-distractor logit contrast.
+mechanism: >-
+  MLP 0 output at the S2 token encodes which name occupies that position;
+  later attention reads it to decide which name was repeated.
+model: openai-community/gpt2
+model_revision: 607a30d783dfa663caf39e06633721c8d4cfcd7e
+unit: MLP block 0 output (all positions)
+scope:
+  task: ioi_s2_flip
+  input_distribution: >-
+    16 registered IOI templates (8 discovery, 8 holdout), 40 single-token first
+    names split 30/10, 12 places, 10 objects, both name orders
+  backends: [eager, sdpa]
+  dtype: float32
+predictions:
+  - id: mean_restoration
+    kind: restoration_at_least
+    components: [0]
+    threshold: 0.5
+    quantifier: mean
+    split: holdout
+  - id: per_case_restoration
+    kind: restoration_at_least
+    components: [0]
+    threshold: 0.25
+    quantifier: per_case
+    max_violation_rate: 0.05
+    split: holdout
+  - id: strongest_block
+    kind: in_top_k
+    components: [0]
+    k: 1
+    split: holdout
+invariances:
+  - kind: repeat
+  - kind: attention_backend
+    note: eager vs SDPA (default dispatch and forced kernels) at fp32
+  - kind: batching
+    note: batch of 16 vs batch of 1, no padding in either
+  - kind: tf32
+    note: the explanation should not depend on TF32 matmuls
+  - kind: mlp_channel_permutation
+  - kind: counterfactual_inputs
+falsification:
+  - held-out mean restoration CI entirely below 0.5
+  - more than 5% of valid held-out cases restore less than 0.25 (Wilson interval above 5%)
+  - MLP 0 not the largest single-block effect in under 5% of bootstrap resamples
+  - a minimal counterexample whose sub-scope fails above the 5% violation rate
+  - prediction outcomes or block selection change under a verified backend, batching or TF32 change
