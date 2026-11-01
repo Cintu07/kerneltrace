@@ -35,6 +35,11 @@ def log(msg: str) -> None:
     print(f"[kerneltrace {time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def _git_state() -> dict:
+    env = environment()
+    return {k: env[k] for k in ("created_utc", "git_commit", "git_dirty", "git_dirty_paths")}
+
+
 def _invariance_for(factors: list[str]) -> str:
     """Map a single numerical factor to the claim invariance it tests.
 
@@ -175,6 +180,8 @@ class Experiment:
     def setup(self) -> None:
         spec = self.spec
         self.determinism = configure_determinism(spec.seed, spec.deterministic)
+        # Captured before anything runs: the code state that produced the measurements.
+        self.environment = environment()
         self.device = resolve_device(spec.device)
         log(f"run {self.run_id} on {self.device}")
         self.tokenizer = load_tokenizer(spec.model, spec.model_revision)
@@ -701,7 +708,8 @@ class Experiment:
                         spec_sha256=self.spec_hash, source_spec=str(self.spec_path),
                         model=self.adapter.describe(), model_revision=self.spec.model_revision,
                         determinism=self.determinism, numerical_state_at_end=numerical_state(),
-                        environment=environment(), seeds=dict(experiment=self.spec.seed),
+                        environment=self.environment, environment_at_export=_git_state(),
+                        seeds=dict(experiment=self.spec.seed),
                         reference_condition=self.ref_condition.model_dump(),
                         reproduce=f"kerneltrace replay {bd.root.as_posix()}")
         bd.json("manifest.json", manifest)

@@ -102,6 +102,8 @@ def _pkg(name: str) -> str | None:
 def environment() -> dict:
     """Software, hardware and code state for the manifest."""
     installed = sorted(f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions())
+    status = _git("status", "--porcelain") or ""
+    dirty = [line.split(maxsplit=1)[1] for line in status.splitlines() if line.strip()]
     env = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "python": sys.version.split()[0],
@@ -116,7 +118,8 @@ def environment() -> dict:
         "cuda_available": torch.cuda.is_available(),
         "nvidia_driver": _driver_version(),
         "git_commit": _git("rev-parse", "HEAD"),
-        "git_dirty": bool(_git("status", "--porcelain")),
+        "git_dirty": bool(dirty),
+        "git_dirty_paths": dirty,
         "packages_sha256": sha256_json(installed),
         "packages": installed,
     }

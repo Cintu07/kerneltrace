@@ -349,8 +349,15 @@ def build_markdown(claim, metrics, manifest, figures) -> str:
     L.append("```\n")
     L.append(f"torch {env['torch']} (CUDA {env['torch_cuda']}), transformers {env['transformers']}, "
              f"{env.get('gpu_name', 'CPU')}, driver {env.get('nvidia_driver')}, git {str(env['git_commit'])[:10]}"
-             f"{' (dirty)' if env['git_dirty'] else ''}.\n")
+             f"{_tree_state(env)}.\n")
     return "\n".join(L)
+
+
+def _tree_state(env: dict) -> str:
+    if not env.get("git_dirty"):
+        return " (clean tree)"
+    paths = env.get("git_dirty_paths")
+    return f" (uncommitted changes: {', '.join(paths)})" if paths else " (uncommitted changes)"
 
 
 def markdown_to_html(md: str, title: str) -> str:
