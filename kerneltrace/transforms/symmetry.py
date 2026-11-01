@@ -54,17 +54,25 @@ class Parity:
     max_kl: float
     argmax_agreement: float
     atol: float
+    rtol: float = 0.0
+    max_excess_over_tolerance: float = 0.0  # max(|a - b| - (atol + rtol * |a|)); <= 0 passes
 
     @property
     def passed(self) -> bool:
-        return self.max_abs_logit_diff <= self.atol and self.argmax_agreement == 1.0
+        return self.max_excess_over_tolerance <= 0 and self.argmax_agreement == 1.0
 
 
-def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float) -> Parity:
-    """Compare two [B, V] (or [B, T, V]) logit tensors over the full vocabulary."""
+def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float, rtol: float = 0.0) -> Parity:
+    """Compare two [B, V] (or [B, T, V]) logit tensors over the full vocabulary.
+
+    The tolerance is atol + rtol * |a| per logit. fp32 summation-order noise grows with the
+    logit's magnitude, so a purely absolute tolerance tuned on one model can fail on a model
+    with larger logits even when the transform is exact.
+    """
     a = a.double().reshape(-1, a.shape[-1])
     b = b.double().reshape(-1, b.shape[-1])
     diff = (a - b).abs()
+    excess = float((diff - (atol + rtol * a.abs())).max())
     la, lb = torch.log_softmax(a, -1), torch.log_softmax(b, -1)
     kl = (la.exp() * (la - lb)).sum(-1)
     return Parity(
@@ -73,6 +81,8 @@ def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float) -> Parity:
         max_kl=float(kl.max()),
         argmax_agreement=float((a.argmax(-1) == b.argmax(-1)).double().mean()),
         atol=atol,
+        rtol=rtol,
+        max_excess_over_tolerance=excess,
     )
 
 

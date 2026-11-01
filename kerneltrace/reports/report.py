@@ -160,8 +160,8 @@ def _f(x, nd=3):
     return str(x)
 
 
-def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
-    v = verdict.to_dict()
+def build_markdown(claim, metrics, manifest, figures) -> str:
+    v = metrics["verdict"]
     L = []
     L.append(f"# Evidence report: `{claim.claim_id}`\n")
     L.append(f"**Status: `{v['status']}`**\n")
@@ -175,19 +175,31 @@ def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
 
     cx = metrics.get("counterexamples") or {}
     L.append("## Smallest contradicting experiment\n")
-    if cx.get("minimized"):
-        best = min(cx["minimized"], key=lambda m: (len(m["changed_axes"]), m["evaluation"]["score"]))
-        d = best["evaluation"]["detail"]
-        L.append(f"Prediction `{cx['prediction']}` requires patching MLP blocks {cx['components']} to restore "
-                 f"at least {cx['threshold']} of the contrast on every valid input. This input is valid "
-                 f"(the model does the task) and fails it. It differs from the base input only in "
-                 f"`{best['changed_axes']}`.\n")
+
+    def prompt_block(d):
         L.append("```text")
         L.append(f"clean:    {d.get('clean')}")
         L.append(f"corrupt:  {d.get('corrupt')}")
         L.append(f"clean margin {d['clean_margin']:+.3f}   corrupt margin {d['corrupt_margin']:+.3f}   "
                  f"patched margin {d['patched_margin']:+.3f}   restoration {d['restoration']:.3f}")
         L.append("```\n")
+
+    base = cx.get("base_input_evaluation") or {}
+    if base.get("violates"):
+        L.append(f"Prediction `{cx['prediction']}` requires patching MLP blocks {cx['components']} to restore "
+                 f"at least {cx['threshold']} of the contrast on every valid input. The base input, the "
+                 f"first point of the search space with nothing varied, is already valid and already "
+                 f"fails it, so no shrinking is needed:\n")
+        prompt_block(base["detail"])
+        L.append(f"Search found {cx['unique_counterexamples']} distinct counterexamples, "
+                 f"{cx['reproduced']} of which reproduced on a fresh evaluation (`counterexamples.jsonl`).\n")
+    elif cx.get("minimized"):
+        best = min(cx["minimized"], key=lambda m: (len(m["changed_axes"]), m["evaluation"]["score"]))
+        L.append(f"Prediction `{cx['prediction']}` requires patching MLP blocks {cx['components']} to restore "
+                 f"at least {cx['threshold']} of the contrast on every valid input. This input is valid "
+                 f"(the model does the task) and fails it. It differs from the base input only in "
+                 f"`{best['changed_axes']}`.\n")
+        prompt_block(best["evaluation"]["detail"])
         for s in cx.get("slices", []):
             L.append(f"- Holding `{s['fixed']}` fixed and randomising everything else: "
                      f"{s['violations']}/{s['valid']} valid inputs fail "
@@ -277,7 +289,12 @@ def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
         L.append(f"Every MLP's hidden channels permuted (seed {sym['seed']}). Output parity over "
                  f"{par.get('scope')}: max |d logit| {_f(par.get('max_abs_logit_diff'))}, argmax agreement "
                  f"{_f(par.get('argmax_agreement'))}, gate {'passed' if par.get('passed') else 'FAILED'} "
+                 f"(tolerance atol + rtol * |logit| with rtol {sym.get('parity_rtol', 0)}) "
                  f"at atol {sym['parity_atol']}.\n")
+        if sym.get("comparisons"):
+            L.append(f"**Comparisons {sym['comparisons']}.** The challenge counts as not validly run, so "
+                     f"the mlp_channel_permutation invariance stays untested.
+")
         if "block_level" in sym:
             b = sym["block_level"]
             L.append(f"Block-level effects on the permuted model: {b['classification']}, max |d patched margin| "
@@ -407,13 +424,29 @@ img{max-width:100%;background:#fcfcfb;border-radius:6px}blockquote{color:var(--i
             f"<style>{css}</style></head><body>{''.join(out)}</body></html>")
 
 
-def write_report(bundle, claim, verdict, metrics, manifest, raw: pd.DataFrame) -> None:
+def write_report(bundle, claim, metrics, manifest) -> None:
     figures = {
         "layers": fig_layers(bundle, metrics),
         "numerical": fig_numerical(bundle, metrics),
         "symmetry": fig_symmetry(bundle, metrics),
         "search": fig_search(bundle, metrics),
     }
-    md = build_markdown(claim, verdict, metrics, manifest, figures)
+    md = build_markdown(claim, metrics, manifest, figures)
     bundle.text("report.md", md)
     bundle.text("report.html", markdown_to_html(md, f"KernelTrace: {claim.claim_id}"))
+
+
+def rebuild(bundle_dir) -> None:
+    """Regenerate report and figures from a bundle's saved metrics, without rerunning anything."""
+    import json
+    from pathlib import Path
+
+    from ..core.spec import load_claim
+    from .bundle import Bundle
+
+    root = Path(bundle_dir)
+    bundle = Bundle(root)
+    metrics = json.loads((root / "metrics.json").read_text(encoding="utf-8"))
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    write_report(bundle, load_claim(root / "claim.yaml"), metrics, manifest)
+    bundle.json("files.json", bundle.file_hashes())

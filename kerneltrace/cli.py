@@ -53,6 +53,14 @@ def cmd_replay(args) -> int:
     return 0 if out["reproduced"] else 2
 
 
+def cmd_report(args) -> int:
+    from .reports.report import rebuild
+
+    rebuild(args.bundle)
+    print(f"{args.bundle}/report.html")
+    return 0
+
+
 def cmd_preflight(args) -> int:
     from .runner import Experiment
 
@@ -78,6 +86,10 @@ def main(argv=None) -> int:
     s.add_argument("bundle")
     s.add_argument("--atol", type=float, default=1e-5)
     s.set_defaults(fn=cmd_replay)
+
+    s = sub.add_parser("report", help="regenerate a bundle's report and figures from its metrics")
+    s.add_argument("bundle")
+    s.set_defaults(fn=cmd_report)
 
     s = sub.add_parser("preflight", help="task validity and baseline gates only")
     s.add_argument("spec")

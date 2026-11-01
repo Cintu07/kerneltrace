@@ -140,6 +140,7 @@ class SymmetrySpec(Strict):
     enabled: bool = True
     seed: int = 1
     parity_atol: float = 1e-3
+    parity_rtol: float = Field(default=0.0, ge=0.0)
     neuron_layers: list[int] = []
     top_k_neurons: int = Field(default=20, ge=1)
     n_cases: int = Field(default=32, ge=4)

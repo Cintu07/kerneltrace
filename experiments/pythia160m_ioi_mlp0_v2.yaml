@@ -1,0 +1,58 @@
+# POST-HOC REVISION of pythia160m_ioi_mlp0, written after v1 came back inconclusive.
+# v1 failed only the permutation parity gate: max |dlogit| 1.4e-3 against an absolute
+# atol of 1e-3. Pythia-160m logits reach ~840, where one fp32 ulp is 6e-5, so that is
+# ~23 ulps of summation-order noise (KL 2e-8, argmax agreement 1.0; an unpermuted rerun
+# is bitwise identical). v2 changes ONLY parity_rtol, a measurement tolerance. The claim
+# card and its thresholds are unchanged. v1 stays in evidence/ as the pre-registered result.
+experiment_id: pythia160m_ioi_mlp0_v2_parity_rtol
+claim: claims/pythia160m_ioi_mlp0_extended_embedding.yaml
+model: EleutherAI/pythia-160m
+model_revision: 50f5173d932e8e61f858120bcb800b97af589f46
+device: auto
+dtype: float32
+attn_implementation: eager
+seed: 0
+deterministic: true
+
+task:
+  n_discovery: 160
+  n_holdout: 160
+  min_contrast: 1.0
+  require_corrupt_flip: true
+  min_valid: 30
+  batch_size: 16
+  max_seq_len: 48
+
+baseline:
+  identity_controls: true
+  random_circuit_controls: 20
+  bootstrap: 2000
+  fidelity_top_k: 3
+
+challenges:
+  numerical:
+    reference: {name: eager_fp32, attn_implementation: eager, dtype: float32}
+    effect_atol: 1.0e-4
+    effect_rtol: 1.0e-3
+    conditions:
+      - {name: eager_fp32_repeat, attn_implementation: eager}
+      - {name: sdpa_fp32_default, attn_implementation: sdpa}
+      - {name: sdpa_fp32_math, attn_implementation: sdpa, sdpa_kernel: math}
+      - {name: sdpa_fp32_efficient, attn_implementation: sdpa, sdpa_kernel: efficient}
+      - {name: sdpa_fp32_flash, attn_implementation: sdpa, sdpa_kernel: flash}
+      - {name: eager_fp32_bs1, attn_implementation: eager, batch_size: 1}
+      - {name: eager_fp32_tf32, attn_implementation: eager, tf32: true}
+      - {name: eager_bf16, attn_implementation: eager, dtype: bfloat16}
+      - {name: eager_fp16, attn_implementation: eager, dtype: float16}
+  symmetry:
+    seed: 1
+    parity_atol: 1.0e-3
+    parity_rtol: 1.0e-5
+    neuron_layers: [0, 10]
+    top_k_neurons: 20
+    n_cases: 48
+  counterexamples:
+    budget_forwards: 900
+    seeds: [0, 1, 2, 3, 4]
+    strategies: [random, coverage, guided]
+    slice_cases: 30

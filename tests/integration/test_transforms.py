@@ -129,3 +129,12 @@ def test_sdpa_and_eager_agree_on_tiny_model(cases):
     la, _ = P.run(e, batch.clean)
     lb, _ = P.run(s, batch.clean)
     assert np.allclose(la.numpy(), lb.numpy(), atol=1e-5)
+
+
+def test_parity_relative_tolerance_scales_with_logit_size():
+    a = torch.tensor([[800.0, -5.0]])
+    b = torch.tensor([[800.0 + 2e-3, -5.0]])  # ~30 fp32 ulps at 800: summation-order noise
+    assert not SYM.logit_parity(a, b, atol=1e-3).passed
+    assert SYM.logit_parity(a, b, atol=1e-3, rtol=1e-5).passed
+    worse = torch.tensor([[800.0, -5.0 + 1e-2]])  # a small logit off by far more than its scale allows
+    assert not SYM.logit_parity(a, worse, atol=1e-3, rtol=1e-5).passed

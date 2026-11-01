@@ -499,7 +499,9 @@ class Experiment:
         log("symmetry: permuting every MLP's hidden channels")
         perms = SYM.random_permutations(self.adapter.n_layers, self.adapter.d_mlp, cfg.seed)
         pm = SYM.permuted_copy(self.adapter, perms)
-        out: dict = {"seed": cfg.seed, "layers_permuted": list(perms), "parity_atol": cfg.parity_atol}
+        out: dict = {"seed": cfg.seed, "layers_permuted": list(perms), "parity_atol": cfg.parity_atol,
+                     "parity_rtol": cfg.parity_rtol}
+        self.results["symmetry"] = out  # filled in below; kept even if the parity gate stops the challenge
         try:
             idx = np.flatnonzero(self.valid)[:cfg.n_cases]
             sub = [self.cases[i] for i in idx]
@@ -510,8 +512,8 @@ class Experiment:
                     for ids in (b.clean, b.corrupt):
                         la, _ = run(self.adapter, ids)
                         lb, _ = run(pm.adapter, ids)
-                        p = SYM.logit_parity(la, lb, cfg.parity_atol)
-                        if worst is None or p.max_abs_logit_diff > worst.max_abs_logit_diff:
+                        p = SYM.logit_parity(la, lb, cfg.parity_atol, cfg.parity_rtol)
+                        if worst is None or p.max_excess_over_tolerance > worst.max_excess_over_tolerance:
                             worst = p
             out["parity"] = asdict(worst) | {"passed": worst.passed, "n_cases": len(sub),
                                              "scope": "all positions, full vocabulary, clean and corrupt"}
@@ -519,6 +521,9 @@ class Experiment:
                 out["comparisons"] = "skipped: output parity failed, the transform is not validated"
                 self.findings.append(V.ChallengeFinding("mlp_channel_permutation", "symmetry", False, False,
                                                         f"parity failed: max |dlogit| {worst.max_abs_logit_diff:.3g}"))
+                log(f"  parity FAILED: max |dlogit| {worst.max_abs_logit_diff:.3g} exceeds atol {cfg.parity_atol} "
+                    f"+ rtol {cfg.parity_rtol} * |logit|; "
+                    f"permuted model not compared")
                 return
             log(f"  parity ok: max |dlogit| {worst.max_abs_logit_diff:.3g}")
 
@@ -569,7 +574,6 @@ class Experiment:
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-        self.results["symmetry"] = out
 
     # ---------------------------------------------------------------- counterexamples
     def evaluator(self, pred: Prediction):
@@ -701,7 +705,7 @@ class Experiment:
                         reference_condition=self.ref_condition.model_dump(),
                         reproduce=f"kerneltrace replay {bd.root.as_posix()}")
         bd.json("manifest.json", manifest)
-        write_report(bd, self.claim, verdict, metrics, manifest, raw)
+        write_report(bd, self.claim, metrics, manifest)
         bd.json("files.json", bd.file_hashes())
         log(f"evidence bundle: {bd.root}")
         return bd.root
