@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Falsification-first experiments for mechanistic interpretability claims"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 authors = [{ name = "Pawan Kalyan" }]
 dependencies = [
     "torch>=2.4",
