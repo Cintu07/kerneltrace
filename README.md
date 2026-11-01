@@ -51,7 +51,7 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\act
 pip install torch --index-url https://download.pytorch.org/whl/cu128   # pick the build for your GPU
 pip install -e ".[dev]"
 
-pytest -q                                            # 61 tests, CPU only, no downloads
+pytest -q                                            # 62 tests, CPU only, no downloads
 kerneltrace validate experiments/claims/*.yaml experiments/*.yaml
 kerneltrace run experiments/gpt2_ioi_mlp0.yaml       # about 6 minutes on an 8 GB laptop GPU
 kerneltrace replay evidence/<bundle>                 # rerun a published bundle's reference measurement
