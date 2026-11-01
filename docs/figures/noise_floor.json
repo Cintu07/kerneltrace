@@ -1,0 +1,8 @@
+{
+  "source": "scripts/noise_floor.py, run 2026-11-01 on RTX 5060 Laptop GPU at commit c324aac; 16 discovery IOI prompts of equal length, fp32 eager, max |logit difference| over all positions and the full vocabulary",
+  "registered_parity_atol": 0.001,
+  "models": {
+    "GPT-2 small": {"permuted vs original": 1.56e-4, "batch 1 vs batch 16": 3.36e-4, "batches of 8 vs 16": 1.98e-4, "max_abs_logit": 150},
+    "Pythia-160m": {"permuted vs original": 3.97e-3, "batch 1 vs batch 16": 4.03e-3, "batches of 8 vs 16": 5.31e-3, "max_abs_logit": 842}
+  }
+}

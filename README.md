@@ -2,6 +2,8 @@
 
 **Find the explanation. Try to break it. Keep the evidence.**
 
+![kerneltrace method](docs/figures/kerneltrace_method.png)
+
 KernelTrace is a local-first lab for testing mechanistic interpretability claims instead of
 just producing them. You write the claim down first, as a claim card with explicit predictions
 and the measurements that would count against it. KernelTrace then measures it on held-out
@@ -40,6 +42,8 @@ size moved GPT-2's causal measurements by at most 2e-4 logits and changed no dec
 changed which blocks get selected. The Pythia parity failure turned out to be the same size as
 Pythia's own batch-to-batch fp32 noise, which shows the parity gate needs to be calibrated
 against a measured noise floor. That is the next change.
+
+![verdicts](docs/figures/fig2_verdicts.png)
 
 These are block-level statements about one task family. They are measurements of where
 restoring a clean activation matters, not a description of the algorithm.
