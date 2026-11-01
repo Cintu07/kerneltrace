@@ -1,0 +1,116 @@
+experiment_id: pythia160m_ioi_mlp0_v2_parity_rtol
+claim: claim.yaml
+model: EleutherAI/pythia-160m
+model_revision: 50f5173d932e8e61f858120bcb800b97af589f46
+device: auto
+dtype: float32
+attn_implementation: eager
+seed: 0
+deterministic: true
+task:
+  name: ioi_s2_flip
+  n_discovery: 160
+  n_holdout: 160
+  min_contrast: 1.0
+  require_corrupt_flip: true
+  min_valid: 30
+  batch_size: 16
+  max_seq_len: 48
+baseline:
+  identity_controls: true
+  random_circuit_controls: 20
+  bootstrap: 2000
+  fidelity_top_k: 3
+challenges:
+  numerical:
+    enabled: true
+    reference:
+      name: eager_fp32
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: float32
+      batch_size: null
+      tf32: false
+    conditions:
+    - name: eager_fp32_repeat
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: float32
+      batch_size: null
+      tf32: false
+    - name: sdpa_fp32_default
+      attn_implementation: sdpa
+      sdpa_kernel: null
+      dtype: float32
+      batch_size: null
+      tf32: false
+    - name: sdpa_fp32_math
+      attn_implementation: sdpa
+      sdpa_kernel: math
+      dtype: float32
+      batch_size: null
+      tf32: false
+    - name: sdpa_fp32_efficient
+      attn_implementation: sdpa
+      sdpa_kernel: efficient
+      dtype: float32
+      batch_size: null
+      tf32: false
+    - name: sdpa_fp32_flash
+      attn_implementation: sdpa
+      sdpa_kernel: flash
+      dtype: float32
+      batch_size: null
+      tf32: false
+    - name: eager_fp32_bs1
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: float32
+      batch_size: 1
+      tf32: false
+    - name: eager_fp32_tf32
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: float32
+      batch_size: null
+      tf32: true
+    - name: eager_bf16
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: bfloat16
+      batch_size: null
+      tf32: false
+    - name: eager_fp16
+      attn_implementation: eager
+      sdpa_kernel: null
+      dtype: float16
+      batch_size: null
+      tf32: false
+    effect_atol: 0.0001
+    effect_rtol: 0.001
+    allow_multi_factor: false
+  symmetry:
+    enabled: true
+    seed: 1
+    parity_atol: 0.001
+    parity_rtol: 1.0e-05
+    neuron_layers:
+    - 0
+    - 10
+    top_k_neurons: 20
+    n_cases: 48
+  counterexamples:
+    enabled: true
+    budget_forwards: 900
+    seeds:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    strategies:
+    - random
+    - coverage
+    - guided
+    slice_cases: 30
+    minimize: true

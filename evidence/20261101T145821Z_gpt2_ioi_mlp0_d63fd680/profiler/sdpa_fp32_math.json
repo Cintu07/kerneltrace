@@ -1,0 +1,24 @@
+{
+  "condition": "sdpa_fp32_math",
+  "requested": {
+    "name": "sdpa_fp32_math",
+    "attn_implementation": "sdpa",
+    "sdpa_kernel": "math",
+    "dtype": "float32",
+    "batch_size": null,
+    "tf32": false
+  },
+  "observed_attention": "math",
+  "verified": true,
+  "problems": [],
+  "attention_ops": [
+    "aten::_safe_softmax",
+    "aten::_scaled_dot_product_attention_math",
+    "aten::_softmax",
+    "aten::scaled_dot_product_attention",
+    "aten::softmax"
+  ],
+  "gemm_kernels": [],
+  "n_distinct_ops": 57,
+  "tf32_matmul_during_run": false
+}

@@ -1,0 +1,10 @@
+{"condition": "eager_fp32", "kind": "single_block_mlp_out_patch", "sites": ["mlp_out.0", "mlp_out.1", "mlp_out.2", "mlp_out.3", "mlp_out.4", "mlp_out.5", "mlp_out.6", "mlp_out.7", "mlp_out.8", "mlp_out.9", "mlp_out.10", "mlp_out.11"], "positions": "all", "source": "clean", "target": "corrupt", "n_cases": 320}
+{"condition": "eager_fp32", "kind": "joint_mlp_out_patch", "sites": ["mlp_out.0"], "positions": "all", "source": "clean", "target": "corrupt", "n_cases": 320}
+{"condition": "eager_fp32_repeat", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "sdpa_fp32_default", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "sdpa_fp32_math", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "sdpa_fp32_efficient", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "eager_fp32_bs1", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "eager_fp32_tf32", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "eager_bf16", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}
+{"condition": "eager_fp16", "kind": "single_block_mlp_out_patch", "sites": "all mlp_out", "n_cases": 320}

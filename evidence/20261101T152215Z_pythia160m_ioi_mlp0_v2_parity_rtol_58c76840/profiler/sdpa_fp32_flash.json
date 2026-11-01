@@ -1,0 +1,8 @@
+{
+  "condition": "sdpa_fp32_flash",
+  "verified": false,
+  "problems": [
+    "probe raised: No available kernel. Aborting execution."
+  ],
+  "observed_attention": "none"
+}

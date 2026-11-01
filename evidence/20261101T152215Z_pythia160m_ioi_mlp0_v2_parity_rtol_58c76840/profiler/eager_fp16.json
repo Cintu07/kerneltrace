@@ -1,0 +1,21 @@
+{
+  "condition": "eager_fp16",
+  "requested": {
+    "name": "eager_fp16",
+    "attn_implementation": "eager",
+    "sdpa_kernel": null,
+    "dtype": "float16",
+    "batch_size": null,
+    "tf32": false
+  },
+  "observed_attention": "eager_matmul_softmax",
+  "verified": true,
+  "problems": [],
+  "attention_ops": [
+    "aten::_softmax",
+    "aten::softmax"
+  ],
+  "gemm_kernels": [],
+  "n_distinct_ops": 53,
+  "tf32_matmul_during_run": false
+}

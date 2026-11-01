@@ -1,0 +1,71 @@
+claim_id: gpt2_ioi_late_mlp_decision_v1
+hypothesis: 'In GPT-2 small on IOI with an S2-flip corruption, the late MLP blocks
+  9, 10 and 11 jointly carry the indirect-object decision: restoring their clean outputs
+  restores at least half of the logit contrast.'
+mechanism: Late MLPs write the answer-name direction into the residual stream at the
+  final position.
+model: openai-community/gpt2
+model_revision: 607a30d783dfa663caf39e06633721c8d4cfcd7e
+unit: MLP block outputs 9, 10, 11 (all positions, patched jointly)
+metric: answer_minus_distractor_logit_margin
+intervention: patch_clean_activation_into_corrupt_run
+scope:
+  task: ioi_s2_flip
+  input_distribution: 16 registered IOI templates (8 discovery, 8 holdout), 40 single-token
+    first names split 30/10, 12 places, 10 objects, both name orders
+  backends:
+  - eager
+  - sdpa
+  dtype: float32
+predictions:
+- id: mean_restoration
+  kind: restoration_at_least
+  components:
+  - 9
+  - 10
+  - 11
+  threshold: 0.5
+  quantifier: mean
+  max_violation_rate: 0.05
+  k: 3
+  split: holdout
+- id: positive_effect
+  kind: effect_positive
+  components:
+  - 9
+  - 10
+  - 11
+  threshold: 0.0
+  quantifier: mean
+  max_violation_rate: 0.05
+  k: 3
+  split: holdout
+- id: per_case_restoration
+  kind: restoration_at_least
+  components:
+  - 9
+  - 10
+  - 11
+  threshold: 0.25
+  quantifier: per_case
+  max_violation_rate: 0.1
+  k: 3
+  split: holdout
+invariances:
+- kind: repeat
+  note: ''
+- kind: attention_backend
+  note: ''
+- kind: batching
+  note: ''
+- kind: tf32
+  note: ''
+- kind: mlp_channel_permutation
+  note: ''
+- kind: counterfactual_inputs
+  note: ''
+falsification:
+- held-out mean restoration CI entirely below 0.5
+- held-out mean effect CI entirely below 0
+- more than 10% of valid held-out cases restore less than 0.25
+status: falsified_in_scope

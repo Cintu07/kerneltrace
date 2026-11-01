@@ -1,0 +1,22 @@
+{
+  "condition": "sdpa_fp32_efficient",
+  "requested": {
+    "name": "sdpa_fp32_efficient",
+    "attn_implementation": "sdpa",
+    "sdpa_kernel": "efficient",
+    "dtype": "float32",
+    "batch_size": null,
+    "tf32": false
+  },
+  "observed_attention": "efficient",
+  "verified": true,
+  "problems": [],
+  "attention_ops": [
+    "aten::_efficient_attention_forward",
+    "aten::_scaled_dot_product_efficient_attention",
+    "aten::scaled_dot_product_attention"
+  ],
+  "gemm_kernels": [],
+  "n_distinct_ops": 43,
+  "tf32_matmul_during_run": false
+}
