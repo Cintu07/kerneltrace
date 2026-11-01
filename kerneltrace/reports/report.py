@@ -293,8 +293,7 @@ def build_markdown(claim, metrics, manifest, figures) -> str:
                  f"at atol {sym['parity_atol']}.\n")
         if sym.get("comparisons"):
             L.append(f"**Comparisons {sym['comparisons']}.** The challenge counts as not validly run, so "
-                     f"the mlp_channel_permutation invariance stays untested.
-")
+                     f"the mlp_channel_permutation invariance stays untested.\n")
         if "block_level" in sym:
             b = sym["block_level"]
             L.append(f"Block-level effects on the permuted model: {b['classification']}, max |d patched margin| "
