@@ -1,4 +1,7 @@
-"""Evidence bundle: one directory per run, every file hashed at the end."""
+"""Evidence bundle: one directory per run, every file hashed at the end.
+
+Text is always written with LF line endings so a bundle hashes the same on every OS.
+"""
 from __future__ import annotations
 
 import json
@@ -38,25 +41,25 @@ class Bundle:
 
     def json(self, rel: str, obj) -> Path:
         p = self.path(rel)
-        p.write_text(json.dumps(_clean(obj), indent=2, default=str), encoding="utf-8")
+        p.write_text(json.dumps(_clean(obj), indent=2, default=str), encoding="utf-8", newline="\n")
         return p
 
     def jsonl(self, rel: str, rows) -> Path:
         p = self.path(rel)
-        with open(p, "w", encoding="utf-8") as f:
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
             for r in rows:
                 f.write(json.dumps(_clean(r), default=str) + "\n")
         return p
 
     def text(self, rel: str, text: str) -> Path:
         p = self.path(rel)
-        p.write_text(text, encoding="utf-8")
+        p.write_text(text, encoding="utf-8", newline="\n")
         return p
 
     def parquet(self, rel: str, df: pd.DataFrame) -> Path:
         p = self.path(rel)
         df.to_parquet(p, index=False)
-        df.to_csv(p.with_suffix(".csv"), index=False)
+        df.to_csv(p.with_suffix(".csv"), index=False, lineterminator="\n")
         return p
 
     def file_hashes(self) -> dict:
