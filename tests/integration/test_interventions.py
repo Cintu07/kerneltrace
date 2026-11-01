@@ -1,4 +1,4 @@
-"""Intervention fidelity (FR-03): null patches are null, a toy oracle is recovered."""
+"""intervention fidelity (fr-03). null patches come back null, and a toy oracle is recovered."""
 import numpy as np
 import pytest
 import torch
@@ -23,7 +23,7 @@ def test_clean_into_clean_returns_clean(gpt2, cases):
 
 
 def test_toy_oracle_recovers_known_effect():
-    """With attention and later MLPs zeroed, a layer-0 MLP patch has a closed form."""
+    """with attention and the later mlps zeroed, a layer-0 mlp patch has a closed form."""
     a = tiny_gpt2(seed=1)
     with torch.no_grad():
         for i, block in enumerate(a.blocks()):
@@ -80,7 +80,7 @@ def test_batched_equals_unbatched_up_to_tolerance(gpt2, cases):
 
 
 def test_neuron_attribution_matches_exact_patch_for_small_change(gpt2, cases):
-    """Attribution patching is a first-order estimate; its sign should agree with exact patching
+    """attribution patching is a first-order estimate. its sign should agree with exact patching
     on the channels it scores highest."""
     batch = P.make_batches(cases, 8, "cpu")[0]
     scores = P.neuron_attribution(gpt2, batch, 1).mean(0)

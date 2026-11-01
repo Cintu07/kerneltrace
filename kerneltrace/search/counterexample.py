@@ -1,12 +1,12 @@
-"""Counterexample search over a discrete space of task-valid inputs.
+"""counterexample search over a discrete space of task-valid inputs.
 
-The engine is model-agnostic. It needs an axis space and an evaluator that
-maps one point to an Evaluation: whether the input is a valid test of the
-task, and a score that is negative when the claim's per-case prediction fails.
-A counterexample is a valid input with a negative score.
+the engine knows nothing about models. it needs an axis space and an evaluator
+that maps one point to an Evaluation: whether the input is a valid test of the
+task, and a score that goes negative when the claim's per-case prediction fails.
+a counterexample is a valid input with a negative score.
 
-Cost is counted in model forward passes, so strategies are compared at equal
-compute rather than equal numbers of proposals.
+cost is counted in model forward passes, so strategies get compared at equal
+compute. counting proposals would flatter the cheap strategies.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def key(axes: dict) -> str:
 
 
 class CachedEvaluator:
-    """Memoises evaluations and charges forwards only for new inputs."""
+    """memoises evaluations and only charges forwards for new inputs."""
 
     def __init__(self, fn: Callable[[dict], Evaluation]):
         self.fn = fn
@@ -101,11 +101,11 @@ def _random(space: Space, ev: CachedEvaluator, budget: int, rng: random.Random, 
 
 
 def _coverage(space: Space, ev: CachedEvaluator, budget: int, rng: random.Random, out: list):
-    """Cycle every axis through all its values so rare values are tested early.
+    """cycle every axis through all its values so rare values get tested early.
 
-    Each proposal takes the least-used value on one axis (rotating which axis)
-    and draws the rest at random. This guarantees every value of every axis is
-    visited within sum(len(values)) proposals.
+    each proposal takes the least-used value on one axis (rotating which axis)
+    and draws the rest at random. every value of every axis gets visited within
+    sum(len(values)) proposals.
     """
     counts = {a: {json.dumps(v): 0 for v in vals} for a, vals in space.values.items()}
     axes_order = list(space.values)
@@ -139,10 +139,10 @@ def _mutate(axes: dict, space: Space, rng: random.Random) -> dict:
 
 def _guided(space: Space, ev: CachedEvaluator, budget: int, rng: random.Random, out: list,
             n_seed: int = 8, patience: int = 6):
-    """Hill-climb on the claim margin: mutate one axis at a time towards lower score.
+    """hill-climb on the claim margin, mutating one axis at a time towards a lower score.
 
-    Starts from a few random valid points, restarts from a fresh random point
-    after `patience` non-improving steps, and never re-counts a cached input.
+    starts from a few random valid points, restarts from a fresh random point
+    after `patience` steps without improvement, and never pays twice for a cached input.
     """
     def fresh():
         while ev.forwards < budget:
@@ -205,10 +205,10 @@ class Minimized:
 
 def minimize(cx: dict, base: dict, fn: Callable[[dict], Evaluation],
              is_valid: Callable[[dict], bool] | None = None) -> Minimized:
-    """Revert axes to the base input while the input stays valid and still fails.
+    """revert axes back to the base input while the input stays valid and still fails.
 
-    Deterministic: axes are tried in sorted order, repeated to a fixpoint. The
-    result differs from the base on as few axes as this greedy pass can manage
+    deterministic. axes are tried in sorted order, over and over until nothing changes.
+    the result differs from the base on as few axes as this greedy pass can get to
     (1-minimal: reverting any single remaining axis breaks validity or the failure).
     """
     current = dict(cx)
@@ -240,9 +240,9 @@ def minimize(cx: dict, base: dict, fn: Callable[[dict], Evaluation],
 
 def slice_test(fixed: dict, space: Space, fn: Callable[[dict], Evaluation], n: int,
                seed: int, max_proposals: int | None = None) -> dict:
-    """Hold some axes fixed, draw the rest at random, and measure the failure rate.
+    """hold some axes fixed, draw the rest at random, and measure the failure rate.
 
-    This turns one minimal counterexample into a statement about a sub-scope:
+    this turns one minimal counterexample into a statement about a sub-scope, like
     "with these axis values the prediction fails on k of n valid inputs".
     """
     rng = random.Random(f"slice:{seed}:{key(fixed)}")
@@ -267,7 +267,7 @@ def slice_test(fixed: dict, space: Space, fn: Callable[[dict], Evaluation], n: i
 
 
 def replay(record: dict, fn: Callable[[dict], Evaluation], tol: float = 1e-3) -> dict:
-    """Re-evaluate a saved counterexample and check it reproduces."""
+    """re-evaluate a saved counterexample and check it still reproduces."""
     e = fn(record["axes"])
     same = (e.valid == record["valid"] and e.violates == record["violates"]
             and (e.score is None or abs(e.score - record["score"]) <= tol))

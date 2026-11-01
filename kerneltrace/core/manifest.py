@@ -1,4 +1,4 @@
-"""Run provenance: everything needed to tell whether two runs are comparable."""
+"""run provenance. everything you need to tell whether two runs can be compared."""
 from __future__ import annotations
 
 import hashlib
@@ -39,7 +39,7 @@ def set_tf32(enabled: bool) -> None:
 
 
 def configure_determinism(seed: int, deterministic: bool) -> dict:
-    """Seed everything and pin the numerical switches. Returns what was set."""
+    """seed everything and pin the numerical switches. returns what it set."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -47,7 +47,7 @@ def configure_determinism(seed: int, deterministic: bool) -> dict:
         torch.cuda.manual_seed_all(seed)
     set_tf32(False)
     if deterministic:
-        # cuBLAS needs this before the first GEMM to be deterministic.
+        # cublas needs this set before the first gemm, or it won't be deterministic.
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.benchmark = False
@@ -100,7 +100,7 @@ def _pkg(name: str) -> str | None:
 
 
 def environment() -> dict:
-    """Software, hardware and code state for the manifest."""
+    """software, hardware and code state, for the manifest."""
     installed = sorted(f"{d.metadata['Name']}=={d.version}" for d in metadata.distributions())
     status = _git("status", "--porcelain") or ""
     dirty = [line.split(maxsplit=1)[1] for line in status.splitlines() if line.strip()]

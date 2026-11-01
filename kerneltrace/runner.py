@@ -1,4 +1,4 @@
-"""End-to-end experiment: claim card in, evidence bundle out."""
+"""the whole experiment. a claim card goes in, an evidence bundle comes out."""
 from __future__ import annotations
 
 import gc
@@ -41,10 +41,10 @@ def _git_state() -> dict:
 
 
 def _invariance_for(factors: list[str]) -> str:
-    """Map a single numerical factor to the claim invariance it tests.
+    """map a single numerical factor to the claim invariance it tests.
 
-    A dtype change is a different measurement, not an invariance of an fp32
-    claim, so it is reported but cannot challenge the claim.
+    changing the dtype is a different measurement for an fp32 claim, so it gets
+    reported but can't challenge the claim.
     """
     if len(factors) != 1:
         return "out_of_scope"
@@ -53,7 +53,7 @@ def _invariance_for(factors: list[str]) -> str:
 
 def _neuron_restoration(adapter: ModelAdapter, batches: list[Batch], layer: int,
                         channels: torch.Tensor) -> np.ndarray:
-    """Per-case restoration from patching a set of hidden channels, using this model's own margins."""
+    """per-case restoration from patching a set of hidden channels, using this model's own margins."""
     out = []
     for b in batches:
         clean = margins(run(adapter, b.clean)[0], b.a_ids, b.b_ids).cpu().numpy()
@@ -65,7 +65,7 @@ def _neuron_restoration(adapter: ModelAdapter, batches: list[Batch], layer: int,
 
 @dataclass
 class Measurement:
-    """Every per-case number one condition produced, in a fixed case order."""
+    """every per-case number one condition produced, in a fixed case order."""
 
     condition: str
     case_ids: list[str]
@@ -81,7 +81,7 @@ class Measurement:
         return self.patched - self.corrupt[:, None]
 
     def _contrast(self) -> np.ndarray:
-        """Clean minus corrupt margin, with exact zeros as NaN so restoration is undefined, not inf."""
+        """clean minus corrupt margin. exact zeros become nan, so restoration comes out undefined."""
         c = self.clean - self.corrupt
         return np.where(c == 0, np.nan, c)
 
@@ -157,7 +157,7 @@ class Experiment:
         self.raw_frames: list[pd.DataFrame] = []
         self.interventions: list[dict] = []
 
-    # ---------------------------------------------------------------- setup
+    # --- setup
     @property
     def ref_condition(self) -> ConditionSpec:
         num = self.spec.challenges.numerical
@@ -180,7 +180,7 @@ class Experiment:
     def setup(self) -> None:
         spec = self.spec
         self.determinism = configure_determinism(spec.seed, spec.deterministic)
-        # Captured before anything runs: the code state that produced the measurements.
+        # grab the code state before anything runs, since that is what produced the measurements.
         self.environment = environment()
         self.device = resolve_device(spec.device)
         log(f"run {self.run_id} on {self.device}")
@@ -195,7 +195,7 @@ class Experiment:
         self.gates["model_revision_pinned"] = (
             pinned, f"revision {spec.model_revision!r}, loaded commit {commit!r}")
 
-    # ---------------------------------------------------------------- tasks
+    # --- tasks
     def names_ok(self, name: str) -> bool:
         return single_token(self.tokenizer, " " + name) is not None
 
@@ -269,7 +269,7 @@ class Experiment:
             df["identity_patched_margin"] = meas.identity.reshape(-1)
         return df
 
-    # ---------------------------------------------------------------- baseline
+    # --- baseline
     def baseline(self) -> None:
         spec, ref = self.spec, self.ref_condition
         t, b = spec.task, spec.baseline
@@ -320,7 +320,7 @@ class Experiment:
             log(f"prediction {p.id}: {p.outcome} ({p.reason})")
 
     def controls(self) -> None:
-        """Random matched-size circuits and discovery-selected held-out fidelity."""
+        """random same-size block sets, and held-out fidelity of the blocks picked on discovery."""
         spec, b, ref = self.spec, self.spec.baseline, self.ref_condition
         L = self.adapter.n_layers
         rng = random.Random(f"controls:{spec.seed}")
@@ -367,7 +367,7 @@ class Experiment:
         log(f"discovery-selected top-{b.fidelity_top_k} layers {list(selected)}; held-out restoration {s['mean']:.3f} "
             f"[{s['ci95_low']:.3f}, {s['ci95_high']:.3f}]")
 
-    # ---------------------------------------------------------------- numerical
+    # --- numerical
     def compare(self, alt: Measurement, alt_preds: list[V.PredictionResult], cfg) -> dict:
         ref, valid = self.ref, self.valid
         m = valid
@@ -497,7 +497,7 @@ class Experiment:
                                                         f"not run: {row.get('problem')}"))
         self.results["numerical"] = rows
 
-    # ---------------------------------------------------------------- symmetry
+    # --- symmetry
     def symmetry(self) -> None:
         cfg = self.spec.challenges.symmetry
         if cfg is None or not cfg.enabled:
@@ -508,7 +508,7 @@ class Experiment:
         pm = SYM.permuted_copy(self.adapter, perms)
         out: dict = {"seed": cfg.seed, "layers_permuted": list(perms), "parity_atol": cfg.parity_atol,
                      "parity_rtol": cfg.parity_rtol}
-        self.results["symmetry"] = out  # filled in below; kept even if the parity gate stops the challenge
+        self.results["symmetry"] = out  # filled in below, and kept even if the parity gate stops the challenge
         try:
             idx = np.flatnonzero(self.valid)[:cfg.n_cases]
             sub = [self.cases[i] for i in idx]
@@ -582,7 +582,7 @@ class Experiment:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-    # ---------------------------------------------------------------- counterexamples
+    # --- counterexamples
     def evaluator(self, pred: Prediction):
         t, ref = self.spec.task, self.ref_condition
         comps = list(pred.components)
@@ -682,7 +682,7 @@ class Experiment:
         self.findings.append(V.ChallengeFinding("counterfactual_inputs", "counterexamples",
                                                 n_repro == len(unique), contradicts, summary))
 
-    # ---------------------------------------------------------------- export
+    # --- export
     def finish(self) -> Path:
         from .reports.report import write_report
 
@@ -744,10 +744,10 @@ def run_experiment(spec_path: str | Path, out_root: str | Path = "runs") -> Path
 
 
 def replay_bundle(bundle_dir: str | Path, atol: float = 1e-5) -> dict:
-    """Re-run a bundle's reference measurement from its own spec and compare per case.
+    """re-run a bundle's reference measurement from its own spec and compare case by case.
 
-    The bundle's experiment.yaml and claim.yaml are used, so the replay needs
-    nothing outside the bundle except the code and the pinned model weights.
+    it uses the bundle's own experiment.yaml and claim.yaml, so the replay needs
+    the code and the pinned model weights and nothing else.
     """
     bundle_dir = Path(bundle_dir)
     exp = Experiment(bundle_dir / "experiment.yaml", out_root=bundle_dir / "replays")

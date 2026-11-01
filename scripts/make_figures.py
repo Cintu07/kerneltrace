@@ -1,6 +1,6 @@
-"""Paper-style figures for docs/FINDINGS.md and posts, built only from evidence/ bundles.
+"""paper-style figures, built only from the evidence bundles.
 
-Usage: python scripts/make_figures.py   -> docs/figures/*.png and *.svg
+usage: python scripts/make_figures.py   -> docs/figures/*.png and *.svg
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / "evidence"
 OUT = ROOT / "docs" / "figures"
 
-# Validated categorical slots 1-3, recessive inks, and reserved status colours.
+# categorical slots 1-3, quiet inks, and the reserved status colours.
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 INK, INK2, MUTED, GRID = "#0b0b0b", "#52514e", "#8a8984", "#e4e3df"
 GOOD, WARN, BAD = "#1a7f37", "#b7791f", "#c62828"

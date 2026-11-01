@@ -1,8 +1,8 @@
-"""Model adapters.
+"""model adapters.
 
-An adapter names the hook points an experiment is allowed to touch and knows
-how to apply weight-space transformations for its architecture. Nothing here
-pretends two architectures are the same: an unsupported model is refused.
+an adapter names the hook points an experiment is allowed to touch, and knows
+how to apply weight-space transforms for its architecture. a model without an
+adapter gets refused outright.
 """
 from __future__ import annotations
 
@@ -46,11 +46,11 @@ class ModelAdapter:
         raise NotImplementedError
 
     def mlp(self, layer: int) -> nn.Module:
-        """Module whose output is the MLP's contribution to the residual stream."""
+        """module whose output is the mlp's contribution to the residual stream."""
         raise NotImplementedError
 
     def mlp_act(self, layer: int) -> nn.Module:
-        """Module whose output is the MLP hidden state after the nonlinearity."""
+        """module whose output is the mlp hidden state after the nonlinearity."""
         raise NotImplementedError
 
     @property
@@ -59,7 +59,7 @@ class ModelAdapter:
 
     @torch.no_grad()
     def permute_mlp(self, layer: int, perm: torch.Tensor) -> None:
-        """Reorder hidden channels of one MLP. Hidden j afterwards is hidden perm[j] before."""
+        """reorder the hidden channels of one mlp. hidden j afterwards is hidden perm[j] before."""
         raise NotImplementedError
 
     def describe(self) -> dict:
@@ -77,7 +77,7 @@ class ModelAdapter:
 
 
 class GPT2Adapter(ModelAdapter):
-    """GPT-2: Conv1D layers store weights as [in, out]."""
+    """gpt-2. its Conv1D layers store weights as [in, out]."""
 
     family = "gpt2"
 
@@ -104,7 +104,7 @@ class GPT2Adapter(ModelAdapter):
 
 
 class GPTNeoXAdapter(ModelAdapter):
-    """GPT-NeoX / Pythia: nn.Linear layers store weights as [out, in]."""
+    """gpt-neox and pythia. nn.Linear layers store weights as [out, in]."""
 
     family = "gpt_neox"
 
@@ -145,7 +145,7 @@ def wrap(model: nn.Module) -> ModelAdapter:
 
 
 def _check_hooks(adapter: ModelAdapter) -> None:
-    """Every hook point the experiments use must exist on every layer."""
+    """every hook point the experiments use has to exist on every layer."""
     for layer in range(adapter.n_layers):
         for name, get in (("mlp", adapter.mlp), ("mlp_act", adapter.mlp_act)):
             mod = get(layer)

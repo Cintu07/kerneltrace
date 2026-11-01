@@ -1,8 +1,8 @@
-"""The search engine against a synthetic claim with a planted failure (FR-06).
+"""the search engine against a synthetic claim with a planted failure (fr-06).
 
-The oracle 'model' satisfies the claim everywhere except when template 3 is
-combined with the object "kiss". A correct engine finds it, minimises it to
-exactly those two axis changes, and confirms the slice fails.
+the oracle 'model' satisfies the claim everywhere except where template 3 meets
+the object "kiss". a working engine finds that, shrinks it to exactly those two
+axis changes, and confirms the slice fails.
 """
 import pytest
 

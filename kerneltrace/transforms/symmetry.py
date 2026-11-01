@@ -1,13 +1,13 @@
-"""Function-preserving MLP channel permutations.
+"""function-preserving mlp channel permutations.
 
-Permuting an MLP's hidden channels, and applying the inverse permutation to
-the down projection, leaves the network's function unchanged in exact
-arithmetic because the nonlinearity is elementwise. In floating point the
-down-projection sums run in a different order, so output parity is measured
-rather than assumed, and nothing is compared until parity passes.
+permute an mlp's hidden channels, apply the inverse permutation to the down
+projection, and the network computes the same function in exact arithmetic,
+because the nonlinearity is elementwise. in floating point the down-projection
+sums run in a different order, so output parity gets measured, and nothing is
+compared until parity passes.
 
-The permutation is returned as an explicit component map. A neuron-level
-claim about "neuron 1234" is only meaningful through that map.
+the permutation comes back as an explicit component map. a claim about
+"neuron 1234" only means something through that map.
 """
 from __future__ import annotations
 
@@ -63,11 +63,11 @@ class Parity:
 
 
 def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float, rtol: float = 0.0) -> Parity:
-    """Compare two [B, V] (or [B, T, V]) logit tensors over the full vocabulary.
+    """compare two [B, V] (or [B, T, V]) logit tensors over the full vocabulary.
 
-    The tolerance is atol + rtol * |a| per logit. fp32 summation-order noise grows with the
-    logit's magnitude, so a purely absolute tolerance tuned on one model can fail on a model
-    with larger logits even when the transform is exact.
+    the tolerance is atol + rtol * |a| per logit. fp32 summation-order noise grows with
+    the size of the logit, so a purely absolute tolerance tuned on one model can fail
+    on a model with bigger logits even when the transform is exact.
     """
     a = a.double().reshape(-1, a.shape[-1])
     b = b.double().reshape(-1, b.shape[-1])
@@ -88,10 +88,10 @@ def logit_parity(a: torch.Tensor, b: torch.Tensor, atol: float, rtol: float = 0.
 
 def mapped_comparison(original_scores: np.ndarray, transformed_scores: np.ndarray,
                       perm: torch.Tensor) -> dict:
-    """Compare per-channel scores with and without the component map.
+    """compare per-channel scores with and without the component map.
 
-    original_scores[i] is channel i in the original model; transformed_scores[j]
-    is channel j in the permuted model, which corresponds to original perm[j].
+    original_scores[i] is channel i in the original model. transformed_scores[j] is
+    channel j in the permuted model, which is original perm[j].
     """
     from scipy.stats import spearmanr
 

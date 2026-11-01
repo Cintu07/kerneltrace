@@ -1,15 +1,15 @@
-"""Indirect object identification (IOI) with an S2-flip corruption.
+"""indirect object identification (ioi) with an s2-flip corruption.
 
 clean:    When Mary and John went to the store, John gave a drink to   -> Mary
 corrupt:  When Mary and John went to the store, Mary gave a drink to   -> John
 
-Clean and corrupt differ in exactly one token (the second subject mention), so
-token positions line up and a full-sequence patch is well defined. The metric
-is logit(IO) - logit(S) at the last position, measured on both runs.
+clean and corrupt differ in exactly one token (the second mention of the subject),
+so token positions line up and a full-sequence patch is well defined. the metric is
+logit(io) - logit(s) at the last position, measured on both runs.
 
-Every case is a point in a small discrete space of axes (template, name order,
-names, place, object). Discovery and holdout use disjoint templates and
-disjoint names, fixed here rather than chosen after seeing results.
+every case is a point in a small discrete space of axes (template, name order,
+names, place, object). discovery and holdout use different templates and
+different names, fixed here before any results existed.
 """
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def case_id(axes: dict) -> str:
 
 
 def render(axes: dict, split: str | None = None) -> IOICase:
-    """Turn one point in the axis space into a clean/corrupt prompt pair."""
+    """turn one point in the axis space into a clean/corrupt prompt pair."""
     io, s = axes["io"], axes["s"]
     if io == s:
         raise ValueError("indirect object and subject must differ")
@@ -102,7 +102,7 @@ def render(axes: dict, split: str | None = None) -> IOICase:
 
 @dataclass
 class AxisSpace:
-    """The discrete input space a split (or a search) is allowed to draw from."""
+    """the discrete input space a split (or a search) is allowed to draw from."""
 
     values: dict[str, list]
     base: dict
@@ -119,7 +119,7 @@ class AxisSpace:
 
 
 def axis_space(split: str, names_ok=None) -> AxisSpace:
-    """Axis values for a split. `names_ok` filters names, e.g. single-token only."""
+    """axis values for a split. `names_ok` filters names, for example to single-token ones."""
     if split == "discovery":
         templates = [t for t in range(len(TEMPLATES)) if t not in HOLDOUT_TEMPLATES]
         names = DISCOVERY_NAMES
@@ -140,7 +140,7 @@ def axis_space(split: str, names_ok=None) -> AxisSpace:
 
 
 def generate(split: str, n: int, seed: int, names_ok=None) -> list[IOICase]:
-    """Sample `n` distinct cases from a split, deterministically from `seed`."""
+    """sample `n` distinct cases from a split, deterministically from `seed`."""
     space = axis_space(split, names_ok)
     rng = random.Random(f"ioi:{split}:{seed}")
     seen: dict[str, IOICase] = {}

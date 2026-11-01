@@ -1,13 +1,13 @@
-"""Causal traces for GPT-2 small on IOI: restore one (token, layer) site at a time.
+"""causal traces for gpt-2 small on ioi, restoring one (token, layer) site at a time.
 
-For each valid prompt pair and each site kind (residual stream after the block,
-MLP output, attention output), the clean activation at one token position and
-one layer is patched into the corrupted run. The cell value is the fraction of
-the clean-minus-corrupt logit contrast that comes back. Done in fp32 (the
-reference) and bf16 (to show what reduced precision does to the picture).
+for each valid prompt pair and each kind of site (residual stream after the block,
+mlp output, attention output), the clean activation at one token and one layer is
+patched into the corrupted run. a cell is the fraction of the clean-minus-corrupt
+logit contrast that comes back. it runs in fp32 (the reference) and in bf16, to
+show what reduced precision does to the picture.
 
-Usage: python scripts/causal_trace.py [n_per_split]
-Writes evidence/causal_trace/gpt2_ioi_trace.json
+usage: python scripts/causal_trace.py [n_per_split]
+writes evidence/causal_trace/gpt2_ioi_trace.json
 """
 from __future__ import annotations
 

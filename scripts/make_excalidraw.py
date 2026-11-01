@@ -1,11 +1,11 @@
-"""Hand-drawn (Excalidraw) versions of the result figures, generated from evidence/.
+"""hand-drawn (excalidraw) versions of the result figures, generated from evidence/.
 
-Chart geometry has to come from the data, so these are generated rather than
-placed by hand. Palette: ink, greys and one blue ramp. Negative values are
-hatched instead of getting a second hue.
+chart geometry has to come from the data, so these get generated, and every bar
+and cell is to scale. the palette is ink, greys and one blue ramp. negative values
+get hatching so the figures stay at one colour.
 
-Usage: python scripts/make_excalidraw.py   -> docs/figures/x_*.excalidraw
-Render each with the excalidraw renderer to get the PNGs.
+usage: python scripts/make_excalidraw.py   -> docs/figures/x_*.excalidraw
+render each one with the excalidraw renderer to get the pngs.
 """
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def bundle(pattern):
 
 
 def shade(v):
-    """Sequential blue for restoration in [0, 1]; returns (fill, text colour)."""
+    """sequential blue for restoration in [0, 1]. returns (fill, text colour)."""
     i = min(len(RAMP) - 1, max(0, round(v * (len(RAMP) - 1))))
     return RAMP[i], (PAPER if i >= 5 else INK)
 
@@ -84,7 +84,7 @@ def fnum(v, d=2):
     return ("−" if v < 0 else "") + f"{abs(v):.{d}f}"
 
 
-# --------------------------------------------------------------------- verdicts
+# --- verdicts
 def verdicts():
     E = [text(40, 30, "three claims, written down before any data. here is what happened.", 30, INK),
          text(42, 78, "gpt-2 small and pythia-160m, indirect object task, held-out prompts", 18, GREY)]
@@ -115,7 +115,7 @@ def verdicts():
     save("x_verdicts", E)
 
 
-# --------------------------------------------------------------------- causal trace
+# --- causal trace
 def trace():
     data = json.loads((EV / "causal_trace" / "gpt2_ioi_trace.json").read_text(encoding="utf-8"))
     P = data["prompts"]
@@ -173,7 +173,7 @@ def trace():
     save("x_trace", E)
 
 
-# --------------------------------------------------------------------- numerical attacks
+# --- numerical attacks
 def numerical():
     order = [("eager_fp32_repeat", "rerun, same settings"), ("sdpa_fp32_math", "different attention kernel (math)"),
              ("sdpa_fp32_efficient", "different attention kernel (mem-efficient)"),
@@ -225,7 +225,7 @@ def numerical():
     save("x_numerical", E)
 
 
-# --------------------------------------------------------------------- neuron shuffle
+# --- neuron shuffle
 def shuffle():
     n = bundle("gpt2_ioi_mlp0")["symmetry"]["neuron_level"][0]
     E = [text(40, 26, "attack 2: shuffle the neurons, keep the math identical", 32, INK),
@@ -262,7 +262,7 @@ def shuffle():
     save("x_shuffle", E)
 
 
-# --------------------------------------------------------------------- pythia noise floor
+# --- pythia noise floor
 def noise():
     d = json.loads((OUT / "noise_floor.json").read_text(encoding="utf-8"))
     E = [text(40, 26, "the claim that came back inconclusive, and why", 32, INK),

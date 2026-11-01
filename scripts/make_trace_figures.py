@@ -1,6 +1,6 @@
-"""Paper-style causal-trace figures from evidence/causal_trace/gpt2_ioi_trace.json.
+"""paper-style causal-trace figures from evidence/causal_trace/gpt2_ioi_trace.json.
 
-Usage: python scripts/make_trace_figures.py -> docs/figures/fig7_*.png, fig8_*.png
+usage: python scripts/make_trace_figures.py -> docs/figures/fig7_*.png, fig8_*.png
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ OUT = ROOT / "docs" / "figures"
 
 INK, INK2, GRID = "#16181d", "#555b66", "#e4e3df"
 BLUE, ORANGE = "#2a78d6", "#eb6834"
-# Diverging blue <-> red through a neutral grey: restoration vs pushing against the answer.
-# Stops sit on the normalised scale so that exactly 0 is the neutral grey.
+# diverging blue <-> red through a neutral grey. blue brings the answer back, red pushes against it.
+# the stops sit on the normalised scale so exactly 0 lands on the neutral grey.
 CMAP = LinearSegmentedColormap.from_list("restoration", [
     (0.0, "#a32020"), (0.25, "#e7a59d"), (0.5, "#f0efec"), (0.6, "#cde2fb"),
     (0.72, "#6da7ec"), (0.85, "#256abf"), (1.0, "#0d366b")])
@@ -53,7 +53,7 @@ def role_matrix(prompts, kind, prec="float32"):
 
 
 def typical_prompt(prompts):
-    """The prompt whose role-aligned residual trace is closest to the mean (stated in the caption)."""
+    """the prompt whose role-aligned residual trace sits closest to the mean (the caption says so)."""
     m = role_matrix(prompts, "resid")
     d = ((m - m.mean(0)) ** 2).sum(axis=(1, 2))
     return prompts[int(np.argmin(d))]

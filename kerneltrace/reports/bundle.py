@@ -1,6 +1,6 @@
-"""Evidence bundle: one directory per run, every file hashed at the end.
+"""evidence bundle. one directory per run, and every file gets hashed at the end.
 
-Text is always written with LF line endings so a bundle hashes the same on every OS.
+text is always written with lf line endings, so a bundle hashes the same on every os.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from ..core.manifest import sha256_file
 
 
 def _clean(obj):
-    """Make results JSON-safe: numpy scalars, tuples as keys, NaN as null."""
+    """make results json-safe. numpy scalars, tuples as keys, nan as null."""
     if isinstance(obj, dict):
         return {(",".join(map(str, k)) if isinstance(k, tuple) else str(k)): _clean(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):

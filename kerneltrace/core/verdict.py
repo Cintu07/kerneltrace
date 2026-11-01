@@ -1,16 +1,16 @@
-"""From measurements to a claim status.
+"""from measurements to a claim status.
 
-The rules, in order:
+the rules run in this order:
 
-1. A failed gate (too few valid cases, an intervention control that did not
-   come back null) makes the claim inconclusive. Nothing downstream can rescue it.
-2. Any prediction whose interval lies on the wrong side of its threshold makes
+1. a failed gate (too few valid cases, a control patch that did not come back
+   null) makes the claim inconclusive. nothing later can rescue it.
+2. a prediction whose interval sits on the wrong side of its threshold makes
    the claim falsified_in_scope.
-3. Any prediction whose interval straddles its threshold makes it inconclusive.
-4. An invariance the claim lists that no valid challenge tested makes it
-   inconclusive: an untested invariance is not a passed one.
-5. A valid challenge that contradicts the claim makes it challenged.
-6. Otherwise the claim is supported_in_scope, and only in that scope.
+3. a prediction whose interval straddles its threshold makes it inconclusive.
+4. an invariance the claim lists that no valid challenge tested makes it
+   inconclusive. an untested invariance is a hole in the evidence.
+5. a valid challenge that contradicts the claim makes it challenged.
+6. otherwise the claim is supported_in_scope, and only in that scope.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from .spec import ClaimCard, Prediction, Status
 
 @dataclass
 class SplitData:
-    """What the verdict needs from one split, valid cases only."""
+    """what the verdict needs from one split, valid cases only."""
 
     split: str
     clusters: np.ndarray          # [N] template id per case
@@ -55,8 +55,8 @@ def evaluate_prediction(p: Prediction, data: SplitData, n_boot: int, seed: int,
     if data.n < min_valid:
         return result("inconclusive", f"only {data.n} valid cases, need {min_valid}")
     comps = tuple(p.components)
-    # A condition can collapse a case's contrast to zero (e.g. bf16 logit spacing), which
-    # leaves restoration undefined. NaN compares False, so it must never count as a pass.
+    # bf16 logit spacing can squash a case's contrast to exactly zero, which
+    # leaves restoration undefined. nan compares false, so it would slip through as a pass.
     values = {"restoration_at_least": data.joint_restoration.get(comps),
               "effect_positive": data.joint_effect.get(comps),
               "in_top_k": data.effects}[p.kind]

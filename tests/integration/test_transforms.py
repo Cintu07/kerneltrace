@@ -1,4 +1,4 @@
-"""Symmetry validation (FR-05) and dispatch probing (FR-04)."""
+"""symmetry validation (fr-05) and dispatch probing (fr-04)."""
 import copy
 
 import numpy as np
@@ -24,7 +24,7 @@ def test_permutation_preserves_function(make, cases):
     lb, _ = P.run(pm.adapter, batch.clean)
     parity = SYM.logit_parity(la, lb, atol=1e-4)
     assert parity.passed, parity
-    # The weights really changed, so this is not a trivial pass.
+    # the weights really changed, so this pass means something.
     assert not torch.equal(a.mlp(0).state_dict()[next(iter(a.mlp(0).state_dict()))],
                            pm.adapter.mlp(0).state_dict()[next(iter(pm.adapter.mlp(0).state_dict()))])
 

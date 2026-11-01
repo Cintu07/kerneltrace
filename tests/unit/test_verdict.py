@@ -1,4 +1,4 @@
-"""The status rules. A failed prerequisite must never yield a passing status."""
+"""the status rules. a failed prerequisite must never produce a passing status."""
 import numpy as np
 
 from kerneltrace.core import verdict as V
@@ -91,7 +91,7 @@ def test_in_top_k():
 
 
 def test_undefined_restoration_is_never_a_pass():
-    """bf16 can make clean and corrupt margins identical; NaN must not count as passing."""
+    """bf16 can make clean and corrupt margins identical. nan must not count as a pass."""
     p = Prediction(id="p", kind="restoration_at_least", components=[0], threshold=0.5,
                    quantifier="per_case", max_violation_rate=0.1)
     vals = [0.9] * 39 + [float("nan")]

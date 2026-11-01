@@ -1,10 +1,10 @@
-"""Task validity gates.
+"""task validity gates.
 
-Two stages. The structural gate needs only the tokenizer: single-token labels,
-equal lengths, exactly one differing position. The behavioural gate needs the
-clean and corrupt margins: the model has to actually do the task on this case
-before an intervention on it means anything. Rejected cases keep their reason
-and stay in the reported denominator.
+there are two. the structural gate only needs the tokenizer: single-token labels,
+equal lengths, exactly one differing position. the behavioural gate needs the
+clean and corrupt margins, because the model has to actually do the task on a
+case before an intervention on it means anything. rejected cases keep their
+reason and stay in the reported denominator.
 """
 from __future__ import annotations
 

@@ -1,10 +1,9 @@
-"""Numerical execution conditions and evidence of what actually ran.
+"""numerical execution conditions, and evidence of what actually ran.
 
-Requesting `attn_implementation="sdpa"` says nothing about which kernel SDPA
-dispatches to. Each condition is therefore probed with the profiler and the
-observed attention path is recorded. If a condition forces a kernel and the
-profiler does not see it, the condition is marked invalid instead of being
-compared as if it had run.
+asking for `attn_implementation="sdpa"` tells you nothing about which kernel sdpa
+dispatches to. so every condition gets profiled, and the attention path the
+profiler saw goes in the record. if a condition forces a kernel and the profiler
+never sees it, the condition is marked invalid and kept out of the comparison.
 """
 from __future__ import annotations
 
@@ -16,7 +15,7 @@ from torch.profiler import ProfilerActivity, profile
 from ..core.manifest import set_tf32
 from ..core.spec import ConditionSpec
 
-# Kernel families recognised in profiler op names, most specific first.
+# kernel families as they show up in profiler op names, most specific first.
 SDPA_OPS = {
     "flash": ("_scaled_dot_product_flash_attention", "_flash_attention_forward"),
     "efficient": ("_scaled_dot_product_efficient_attention", "_efficient_attention_forward"),
@@ -39,7 +38,7 @@ def _sdpa_backend(name: str):
 
 @contextmanager
 def execution(condition: ConditionSpec):
-    """Apply the condition's TF32 and SDPA-kernel settings for the duration."""
+    """apply the condition's tf32 and sdpa-kernel settings for the duration."""
     prev = (torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32,
             torch.get_float32_matmul_precision())
     set_tf32(condition.tf32)
@@ -59,7 +58,7 @@ def execution(condition: ConditionSpec):
 
 
 def observed_attention(op_names: set[str]) -> str:
-    """Name the attention path seen in a set of profiler op names."""
+    """name the attention path seen in a set of profiler op names."""
     found = [fam for fam, keys in SDPA_OPS.items()
              if any(k in name for name in op_names for k in keys)]
     if found:
@@ -72,7 +71,7 @@ def observed_attention(op_names: set[str]) -> str:
 
 
 def probe(adapter, input_ids: torch.Tensor, condition: ConditionSpec) -> dict:
-    """Profile one forward and decide whether the condition ran as requested."""
+    """profile one forward and decide whether the condition ran as requested."""
     activities = [ProfilerActivity.CPU]
     if input_ids.is_cuda:
         activities.append(ProfilerActivity.CUDA)
@@ -108,7 +107,7 @@ def probe(adapter, input_ids: torch.Tensor, condition: ConditionSpec) -> dict:
 
 
 def factors(reference: ConditionSpec, condition: ConditionSpec) -> list[str]:
-    """Which experimental factors differ between two conditions."""
+    """which experimental factors differ between two conditions."""
     out = []
     if (reference.attn_implementation, reference.sdpa_kernel) != (
             condition.attn_implementation, condition.sdpa_kernel):

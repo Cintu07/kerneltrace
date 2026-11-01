@@ -1,8 +1,8 @@
-"""Human-readable report: Markdown, static HTML and SVG figures from metrics.json.
+"""the readable report. markdown, static html and svg figures, all from metrics.json.
 
-The report never states more than the verdict does. Its first section after
-the verdict is the smallest reproducible input that contradicts the claim,
-when one was found, because that is the most useful thing a reader can see.
+the report never says more than the verdict does. right after the verdict it
+shows the smallest input that contradicts the claim, when there is one, because
+that is the most useful thing a reader can look at.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import re
 import numpy as np
 import pandas as pd
 
-# Reference categorical slots 1-3 (validated all-pairs), plus recessive inks.
+# categorical slots 1-3 (they pass the all-pairs colour checks), plus quiet inks.
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
@@ -361,7 +361,7 @@ def _tree_state(env: dict) -> str:
 
 
 def markdown_to_html(md: str, title: str) -> str:
-    """Small converter for the subset build_markdown emits."""
+    """a small converter for the bit of markdown that build_markdown writes."""
     out, in_code, in_list, table = [], False, False, []
 
     def inline(s):
@@ -443,7 +443,7 @@ def write_report(bundle, claim, metrics, manifest) -> None:
 
 
 def rebuild(bundle_dir) -> None:
-    """Regenerate report and figures from a bundle's saved metrics, without rerunning anything."""
+    """regenerate a bundle's report and figures from its saved metrics. nothing gets rerun."""
     import json
     from pathlib import Path
 

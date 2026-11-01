@@ -1,4 +1,4 @@
-"""kerneltrace command line."""
+"""the kerneltrace command line."""
 from __future__ import annotations
 
 import argparse

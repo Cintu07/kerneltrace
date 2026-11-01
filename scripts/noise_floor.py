@@ -1,7 +1,7 @@
-"""Is a permutation's parity gap bigger than the model's own fp32 noise floor?
+"""is a permutation's parity gap bigger than the model's own fp32 noise floor?
 
-Compares permuted-vs-original logits with the same model run at different batch sizes.
-Usage: python scripts/noise_floor.py   (needs CUDA and the pinned weights)
+compares permuted-vs-original logits with the same model run at different batch sizes.
+usage: python scripts/noise_floor.py   (needs cuda and the pinned weights)
 """
 import sys, torch
 from kerneltrace.core.manifest import configure_determinism

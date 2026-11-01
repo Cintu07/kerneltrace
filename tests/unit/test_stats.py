@@ -36,7 +36,7 @@ def test_wilson_contains_point_estimate():
 
 
 def test_cluster_bootstrap_resamples_whole_clusters():
-    # Two clusters with constant values: every resample mean is a mix of 0 and 10 by cluster.
+    # two clusters with constant values, so every resample mean is some mix of 0 and 10.
     values = np.array([0.0] * 5 + [10.0] * 5)
     clusters = np.array([0] * 5 + [1] * 5)
     boot = S.cluster_bootstrap(values, clusters, 500, seed=0)

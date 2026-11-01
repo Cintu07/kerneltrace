@@ -1,10 +1,10 @@
-"""Activation capture and patching.
+"""activation capture and patching.
 
-Sites are ("mlp_out", layer) for a block's MLP output and ("mlp_hidden", layer)
-for the post-nonlinearity hidden channels. A patch replaces a site's output
-with a stored tensor, optionally only on a subset of hidden channels. Every
-patch checks shapes and records that it fired, so an intervention that
-silently did nothing cannot be mistaken for a null effect.
+sites are ("mlp_out", layer) for a block's mlp output and ("mlp_hidden", layer)
+for the hidden channels after the nonlinearity. a patch swaps a site's output
+for a stored tensor, optionally on just a subset of hidden channels. every patch
+checks shapes and counts how often it fired, so a patch that silently did
+nothing raises an error.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def site_module(adapter: ModelAdapter, site: Site):
 @dataclass
 class Patch:
     value: torch.Tensor
-    channels: torch.Tensor | None = None  # last-dim indices to replace; None = all
+    channels: torch.Tensor | None = None  # last-dim indices to replace, None means all of them
     fired: int = field(default=0, init=False)
 
 
@@ -69,11 +69,11 @@ def _patch_hook(site: Site, patch: Patch):
 @torch.no_grad()
 def run(adapter: ModelAdapter, input_ids: torch.Tensor, capture: list[Site] = (),
         patches: dict[Site, Patch] | None = None) -> tuple[torch.Tensor, dict[Site, torch.Tensor]]:
-    """One forward pass, capturing and/or patching sites. Returns logits and captures."""
+    """one forward pass, capturing and/or patching sites. returns logits and captures."""
     patches = patches or {}
     store: dict[Site, torch.Tensor] = {}
     pairs = [(site_module(adapter, s), _patch_hook(s, p)) for s, p in patches.items()]
-    # Capture hooks go after patch hooks so they see the patched value.
+    # capture hooks go after patch hooks so they see the patched value.
     pairs += [(site_module(adapter, s), _capture_hook(store, s)) for s in capture]
     with _hooks(pairs):
         logits = adapter.model(input_ids=input_ids).logits
@@ -84,7 +84,7 @@ def run(adapter: ModelAdapter, input_ids: torch.Tensor, capture: list[Site] = ()
 
 
 def margins(logits: torch.Tensor, a_ids: torch.Tensor, b_ids: torch.Tensor) -> torch.Tensor:
-    """logit(answer) - logit(distractor) at the final position, in float64."""
+    """logit(answer) - logit(distractor) at the last position, in float64."""
     last = logits[:, -1, :].double()
     rows = torch.arange(last.shape[0], device=last.device)
     return last[rows, a_ids] - last[rows, b_ids]
@@ -104,7 +104,7 @@ class Batch:
 
 
 def make_batches(cases: list[TokenizedCase], batch_size: int, device) -> list[Batch]:
-    """Group equal-length cases so no padding (and no padding numerics) is involved."""
+    """group equal-length cases, so there is no padding and no padding numerics either."""
     by_len: dict[int, list[TokenizedCase]] = {}
     for c in cases:
         by_len.setdefault(c.length, []).append(c)
@@ -129,7 +129,7 @@ def mlp_sites(adapter: ModelAdapter) -> list[Site]:
 
 @dataclass
 class BlockEffects:
-    """Per-case, per-layer results of single-block MLP patching on one batch."""
+    """per-case, per-layer results of single-block mlp patching on one batch."""
 
     case_ids: list[str]
     clean: np.ndarray            # [B]
@@ -164,7 +164,7 @@ def block_effects(adapter: ModelAdapter, batch: Batch, identity_controls: bool =
 
 def joint_patch_margins(adapter: ModelAdapter, batch: Batch, layers: list[int],
                         clean_cache: dict | None = None) -> np.ndarray:
-    """Margins on the corrupt run with clean MLP outputs restored at all `layers` at once."""
+    """margins on the corrupt run with clean mlp outputs restored at all of `layers` at once."""
     sites = [("mlp_out", layer) for layer in layers]
     if clean_cache is None:
         _, clean_cache = run(adapter, batch.clean, capture=sites)
@@ -173,10 +173,10 @@ def joint_patch_margins(adapter: ModelAdapter, batch: Batch, layers: list[int],
 
 
 def neuron_attribution(adapter: ModelAdapter, batch: Batch, layer: int) -> np.ndarray:
-    """Attribution patching: first-order estimate of each hidden channel's patch effect.
+    """attribution patching, a first-order guess at each hidden channel's patch effect.
 
     score[b, n] = sum_t (h_clean - h_corrupt)[b, t, n] * d margin / d h[b, t, n],
-    with the gradient taken on the corrupt run. Returns [B, d_mlp].
+    with the gradient taken on the corrupt run. returns [B, d_mlp].
     """
     site = ("mlp_hidden", layer)
     _, clean_cache = run(adapter, batch.clean, capture=[site])
@@ -198,7 +198,7 @@ def neuron_attribution(adapter: ModelAdapter, batch: Batch, layer: int) -> np.nd
 
 def neuron_patch_margins(adapter: ModelAdapter, batch: Batch, layer: int,
                          channels: torch.Tensor) -> np.ndarray:
-    """Exact patch of a subset of hidden channels (clean into corrupt)."""
+    """exact patch of a subset of hidden channels, clean into corrupt."""
     site = ("mlp_hidden", layer)
     _, clean_cache = run(adapter, batch.clean, capture=[site])
     logits, _ = run(adapter, batch.corrupt,

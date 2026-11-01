@@ -1,9 +1,9 @@
-"""Claim cards and experiment specs.
+"""claim cards and experiment specs.
 
-A claim card states what a mechanism is supposed to do and, more importantly,
-which measurements would count against it. An experiment spec says how the
-claim is tested. Both are plain YAML validated here, so a malformed claim is
-rejected before any GPU time is spent on it.
+a claim card says what a mechanism is supposed to do and, more usefully, which
+measurements would count against it. an experiment spec says how the claim gets
+tested. both are plain yaml checked here, so a broken claim gets rejected before
+it burns any gpu time.
 """
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ class Strict(BaseModel):
 
 
 class Prediction(Strict):
-    """One observable consequence of the hypothesis.
+    """one observable consequence of the hypothesis.
 
     kind:
-      restoration_at_least  patching `components` jointly (clean into corrupt)
-                            restores at least `threshold` of the logit contrast.
-                            quantifier=mean tests the mean with a bootstrap CI;
-                            quantifier=per_case requires each case to clear the
-                            threshold, allowing `max_violation_rate` failures.
+      restoration_at_least  patching `components` together (clean into corrupt)
+                            brings back at least `threshold` of the logit contrast.
+                            quantifier=mean tests the mean with a bootstrap ci.
+                            quantifier=per_case wants every case to clear the
+                            threshold, with `max_violation_rate` failures allowed.
       effect_positive       the joint patch moves the margin towards clean.
       in_top_k              every listed component ranks in the top `k` layers
                             by mean causal effect.
@@ -93,7 +93,7 @@ class ClaimCard(Strict):
         return self
 
     def per_case_prediction(self) -> Prediction | None:
-        """The prediction a single input can contradict, used by counterexample search."""
+        """the prediction a single input can contradict. counterexample search uses this one."""
         for p in self.predictions:
             if p.kind == "restoration_at_least" and p.quantifier == "per_case":
                 return p
@@ -189,7 +189,7 @@ def load_claim(path: str | Path) -> ClaimCard:
 
 
 def load_experiment(path: str | Path) -> tuple[ExperimentSpec, ClaimCard]:
-    """Load an experiment and its claim, and check they describe the same model."""
+    """load an experiment and its claim, and check they are about the same model."""
     path = Path(path)
     spec = ExperimentSpec.model_validate(_load_yaml(path))
     claim_path = Path(spec.claim)

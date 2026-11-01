@@ -1,7 +1,7 @@
-"""Effect sizes, uncertainty and stability metrics.
+"""effect sizes, uncertainty and stability metrics.
 
-Bootstrap resampling is clustered by template: prompts from one template are
-not independent evidence, so the template is the sampling unit.
+bootstrap resampling is clustered by template. prompts from one template are
+correlated evidence, so the template is the thing that gets resampled.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from scipy.stats import norm, spearmanr
 
 
 def relative_restoration(clean, corrupt, patched, epsilon: float = 1e-5):
-    """(patched - corrupt) / (clean - corrupt); None when the contrast is too small."""
+    """(patched - corrupt) / (clean - corrupt), or None when the contrast is too small."""
     denominator = clean - corrupt
     if abs(denominator) < epsilon:
         return None
@@ -20,7 +20,7 @@ def relative_restoration(clean, corrupt, patched, epsilon: float = 1e-5):
 
 
 def restoration_array(clean: np.ndarray, corrupt: np.ndarray, patched: np.ndarray) -> np.ndarray:
-    """Vectorised restoration. Callers must have gated cases on min_contrast already."""
+    """vectorised restoration. callers must have gated cases on min_contrast already."""
     contrast = clean - corrupt
     if np.any(np.abs(contrast) < 1e-5):
         raise ValueError("restoration requested for a case with no contrast")
@@ -34,9 +34,9 @@ def _cluster_index(clusters: np.ndarray):
 
 def cluster_bootstrap(values: np.ndarray, clusters: np.ndarray, n_boot: int, seed: int,
                       stat=np.mean) -> np.ndarray:
-    """Bootstrap distribution of `stat` over the first axis, resampling whole clusters.
+    """bootstrap distribution of `stat` over the first axis, resampling whole clusters.
 
-    `values` may be [N] or [N, K]; the statistic is applied along axis 0.
+    `values` can be [N] or [N, K], and the statistic runs along axis 0.
     """
     values = np.asarray(values, dtype=float)
     labels, members = _cluster_index(np.asarray(clusters))
@@ -70,7 +70,7 @@ def summarize(values: np.ndarray, clusters: np.ndarray, n_boot: int, seed: int) 
 
 
 def wilson(k: int, n: int, level: float = 0.95) -> tuple[float, float]:
-    """Wilson score interval for a binomial proportion."""
+    """wilson score interval for a binomial proportion."""
     if n == 0:
         return 0.0, 1.0
     z = norm.ppf(1 - (1 - level) / 2)
@@ -91,7 +91,7 @@ def spearman(a, b) -> float | None:
 
 
 def topk_overlap(a, b, k: int = 3):
-    """Jaccard overlap among top-k indices by absolute effect (v0.1 metric, kept for continuity)."""
+    """jaccard overlap of the top-k indices by absolute effect. kept from v0.1 so old numbers still compare."""
     if len(a) != len(b):
         raise ValueError("Effect vectors must have equal length")
     if not len(a):
@@ -103,9 +103,9 @@ def topk_overlap(a, b, k: int = 3):
 
 
 def topk_with_ties(a, b, k: int = 3, tie_tol: float = 1e-6) -> dict:
-    """Top-k Jaccard plus a warning when the k-th and (k+1)-th magnitudes are a near tie.
+    """top-k jaccard, plus a warning when the k-th and (k+1)-th magnitudes are a near tie.
 
-    A rank flip across a near tie is not evidence of a different explanation.
+    a rank flip across a near tie says nothing about the explanation.
     """
     out = {"jaccard": topk_overlap(a, b, k), "near_tie": False}
     for v in (a, b):
