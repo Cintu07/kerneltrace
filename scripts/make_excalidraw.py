@@ -293,7 +293,61 @@ def noise():
     save("x_noise", E)
 
 
+# --- the readme diagram: tall enough to read at github's column width
+def method():
+    W = 1100
+    E = [text(0, 20, "kerneltrace", 46, INK, align="center", w=W),
+         text(0, 84, "write the claim down, then try to break it", 24, GREY, align="center", w=W)]
+
+    def step(y, n, title):
+        E.append(text(60, y, f"{n}", 30, BLUE))
+        E.append(text(100, y + 2, title, 28, INK))
+
+    def down(x, y0, y1):
+        E.append(line([(x, y0), (x, y1)], INK, 2.5, arrow=True))
+
+    # 1. the claim, as it actually sits in git
+    step(150, 1, "write the claim down first")
+    E.append(rect(100, 200, 950, 130, backgroundColor=INK, strokeColor=INK))
+    E.append(text(130, 222, "claim: mlp block 0 restores at least half the answer\nthreshold: 0.5 on prompts it has never seen\ncommitted to git before any measurement",
+                  22, PAPER, font=CODE))
+    down(W / 2, 362, 412)
+
+    # 2. the measurement
+    step(420, 2, "measure it on unseen prompts")
+    E.append(text(100, 470, "0.84", 72, BLUE))
+    E.append(text(300, 482, "of the answer comes back on 129 held-out\nprompts (95% ci 0.82 to 0.86)", 22, GREY))
+    down(W / 2, 580, 630)
+
+    # 3. three attacks side by side, converging on the verdict
+    step(640, 3, "try to break it")
+    attacks = [("run it differently", "other attention kernels,\nbatch sizes, tf32, bf16"),
+               ("shuffle the neurons", "same math, every\nneuron id scrambled"),
+               ("search for a breaker", "thousands of prompts,\nshrink any that break it")]
+    bw, gap, top = 300, 50, 692
+    for i, (head, body) in enumerate(attacks):
+        x = 100 + i * (bw + gap)
+        E.append(rect(x, top, bw, 150, strokeColor=INK, strokeWidth=2.5))
+        E.append(text(x + 22, top + 22, head, 24, INK))
+        E.append(text(x + 22, top + 66, body, 20, GREY))
+        E.append(line([(x + bw / 2, top + 156), (W / 2, top + 222)], INK, 2, arrow=True))
+
+    # 4. the three possible outcomes
+    step(924, 4, "verdict")
+    pills = [("supported", dict(backgroundColor=BLUE, strokeColor=BLUE), PAPER),
+             ("falsified", dict(backgroundColor=RULE, fillStyle="hachure", strokeColor=INK), INK),
+             ("inconclusive", dict(strokeStyle="dashed", strokeColor=INK), INK)]
+    for i, (label, style, tc) in enumerate(pills):
+        x = 100 + i * (bw + gap)
+        E.append(rect(x, 976, bw, 64, strokeWidth=2.5, **style))
+        E.append(text(x, 992, label, 26, tc, align="center", w=bw))
+    E.append(text(0, 1072, "a failed check never turns into a pass. it turns into inconclusive.", 22, GREY,
+                  align="center", w=W))
+    save("x_method", E)
+
+
 if __name__ == "__main__":
+    method()
     verdicts()
     trace()
     numerical()
