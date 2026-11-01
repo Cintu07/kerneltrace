@@ -43,7 +43,7 @@ changed which blocks get selected. The Pythia parity failure turned out to be th
 Pythia's own batch-to-batch fp32 noise, which shows the parity gate needs to be calibrated
 against a measured noise floor. That is the next change.
 
-![verdicts](docs/figures/fig2_verdicts.png)
+![verdicts](docs/figures/x_verdicts.png)
 
 These are block-level statements about one task family. They are measurements of where
 restoring a clean activation matters, not a description of the algorithm.
