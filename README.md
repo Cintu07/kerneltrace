@@ -29,11 +29,17 @@ Three claims were pre-registered (committed before any measurement, see the git 
 `experiments/claims/`) and tested on an RTX 5060 Laptop GPU. Full write-up with every number:
 [docs/FINDINGS.md](docs/FINDINGS.md). Bundles: [evidence/](evidence/).
 
-| claim | model | status |
-|---|---|---|
-| MLP 0 acts as an extended embedding on IOI: restoring it restores at least half the logit contrast | GPT-2 small | RESULT_MLP0 |
-| Late MLPs 9-11 jointly carry the IOI decision | GPT-2 small | RESULT_LATE |
-| Same MLP 0 claim, cross-architecture replication | Pythia-160m | RESULT_PYTHIA |
+| claim | model | status | why |
+|---|---|---|---|
+| Restoring MLP 0 restores at least half the IOI logit contrast | GPT-2 small | `supported_in_scope` | held-out restoration 0.84 [0.82, 0.86]; survived every listed challenge |
+| Late MLPs 9-11 jointly carry the IOI decision | GPT-2 small | `falsified_in_scope` | held-out restoration 0.084 [0.076, 0.092] against 0.5 |
+| Same MLP 0 claim on another architecture | Pythia-160m | `inconclusive` | effect replicates (0.997), but the permutation parity gate failed, so a listed invariance went untested |
+
+At fp32, switching attention kernels (eager, SDPA math, SDPA memory-efficient) or batch
+size moved GPT-2's causal measurements by at most 2e-4 logits and changed no decision. bf16
+changed which blocks get selected. The Pythia parity failure turned out to be the same size as
+Pythia's own batch-to-batch fp32 noise, which shows the parity gate needs to be calibrated
+against a measured noise floor. That is the next change.
 
 These are block-level statements about one task family. They are measurements of where
 restoring a clean activation matters, not a description of the algorithm.
@@ -45,10 +51,10 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\act
 pip install torch --index-url https://download.pytorch.org/whl/cu128   # pick the build for your GPU
 pip install -e ".[dev]"
 
-pytest -q                                            # 58 tests, CPU only, no downloads
+pytest -q                                            # 61 tests, CPU only, no downloads
 kerneltrace validate experiments/claims/*.yaml experiments/*.yaml
 kerneltrace run experiments/gpt2_ioi_mlp0.yaml       # about 6 minutes on an 8 GB laptop GPU
-kerneltrace replay runs/<run_id>                     # rerun the reference measurement and compare
+kerneltrace replay evidence/<bundle>                 # rerun a published bundle's reference measurement
 ```
 
 Open `runs/<run_id>/report.html` for the report.
