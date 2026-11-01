@@ -1,7 +1,7 @@
-# Pre-registered before any Pythia measurement was taken with this code. Same
-# hypothesis and thresholds as the GPT-2 claim: a cross-architecture replication.
-# Thresholds below are fixed here and must not be edited after seeing results;
-# a revised claim gets a new claim_id.
+# written down before this code measured anything on pythia. same hypothesis and
+# same thresholds as the gpt-2 claim, to see if it holds on a different architecture.
+# the thresholds are fixed here and don't get edited after seeing results.
+# a changed claim gets a new claim_id.
 claim_id: pythia160m_ioi_mlp0_extended_embedding_v1
 hypothesis: >-
   In Pythia-160m on IOI with an S2-flip corruption, MLP block 0 acts as an

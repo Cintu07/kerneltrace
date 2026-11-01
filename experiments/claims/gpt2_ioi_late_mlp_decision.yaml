@@ -1,6 +1,6 @@
-# Pre-registered before any GPT-2 measurement was taken with this code.
-# A deliberately strong claim about late MLPs. Published IOI analyses put the
-# decision mostly in attention heads, so this is expected to be at risk.
+# written down before this code measured anything on gpt-2.
+# a deliberately strong claim about the late mlps. published ioi work puts the
+# decision mostly in attention heads, so i expect this one to lose.
 claim_id: gpt2_ioi_late_mlp_decision_v1
 hypothesis: >-
   In GPT-2 small on IOI with an S2-flip corruption, the late MLP blocks 9, 10

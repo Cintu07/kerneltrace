@@ -1,6 +1,6 @@
-# Pre-registered before any GPT-2 measurement was taken with this code.
-# Thresholds below are fixed here and must not be edited after seeing results;
-# a revised claim gets a new claim_id.
+# written down before this code measured anything on gpt-2.
+# the thresholds are fixed here and don't get edited after seeing results.
+# a changed claim gets a new claim_id.
 claim_id: gpt2_ioi_mlp0_extended_embedding_v1
 hypothesis: >-
   In GPT-2 small on IOI with an S2-flip corruption, MLP block 0 acts as an

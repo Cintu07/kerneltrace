@@ -1,9 +1,9 @@
-# POST-HOC REVISION of pythia160m_ioi_mlp0, written after v1 came back inconclusive.
-# v1 failed only the permutation parity gate: max |dlogit| 1.4e-3 against an absolute
-# atol of 1e-3. Pythia-160m logits reach ~840, where one fp32 ulp is 6e-5, so that is
-# ~23 ulps of summation-order noise (KL 2e-8, argmax agreement 1.0; an unpermuted rerun
-# is bitwise identical). v2 changes ONLY parity_rtol, a measurement tolerance. The claim
-# card and its thresholds are unchanged. v1 stays in evidence/ as the pre-registered result.
+# a second try at the pythia run, written after the first one came back inconclusive.
+# the first run only failed the neuron shuffle parity check, 1.4e-3 against a fixed 1e-3.
+# pythia's logits go up to about 840, where one fp32 step is 6e-5, so that gap is around
+# 23 steps of plain rounding noise (kl 2e-8, every argmax the same, and rerunning the
+# untouched model gives identical bits). the only thing changed here is parity_rtol.
+# the claim and its thresholds stay the same, and the first run stays in evidence/.
 experiment_id: pythia160m_ioi_mlp0_v2_parity_rtol
 claim: claims/pythia160m_ioi_mlp0_extended_embedding.yaml
 model: EleutherAI/pythia-160m
