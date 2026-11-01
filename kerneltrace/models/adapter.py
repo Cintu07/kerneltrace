@@ -159,7 +159,7 @@ def load(model_id: str, revision: str, attn_implementation: str = "eager",
 
     model = AutoModelForCausalLM.from_pretrained(
         model_id, revision=revision, attn_implementation=attn_implementation,
-        torch_dtype=DTYPES[dtype],
+        dtype=DTYPES[dtype],
     ).to(device)
     adapter = wrap(model)
     if adapter.attn_implementation != attn_implementation:

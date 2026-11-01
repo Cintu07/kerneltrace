@@ -55,6 +55,15 @@ def evaluate_prediction(p: Prediction, data: SplitData, n_boot: int, seed: int,
     if data.n < min_valid:
         return result("inconclusive", f"only {data.n} valid cases, need {min_valid}")
     comps = tuple(p.components)
+    # A condition can collapse a case's contrast to zero (e.g. bf16 logit spacing), which
+    # leaves restoration undefined. NaN compares False, so it must never count as a pass.
+    values = {"restoration_at_least": data.joint_restoration.get(comps),
+              "effect_positive": data.joint_effect.get(comps),
+              "in_top_k": data.effects}[p.kind]
+    bad = int((~np.isfinite(values)).sum())
+    if bad:
+        return result("inconclusive", f"{bad} values are undefined (zero clean-corrupt contrast under "
+                                      f"this condition)", n=data.n, undefined=bad)
     if p.kind == "restoration_at_least" and p.quantifier == "mean":
         s = summarize(data.joint_restoration[comps], data.clusters, n_boot, seed)
         if s["ci95_low"] >= p.threshold:

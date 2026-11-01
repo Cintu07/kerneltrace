@@ -75,11 +75,16 @@ class Measurement:
     def effects(self) -> np.ndarray:
         return self.patched - self.corrupt[:, None]
 
+    def _contrast(self) -> np.ndarray:
+        """Clean minus corrupt margin, with exact zeros as NaN so restoration is undefined, not inf."""
+        c = self.clean - self.corrupt
+        return np.where(c == 0, np.nan, c)
+
     def restoration(self) -> np.ndarray:
-        return (self.patched - self.corrupt[:, None]) / (self.clean - self.corrupt)[:, None]
+        return (self.patched - self.corrupt[:, None]) / self._contrast()[:, None]
 
     def joint_restoration(self, comps: tuple) -> np.ndarray:
-        return (self.joint[comps] - self.corrupt) / (self.clean - self.corrupt)
+        return (self.joint[comps] - self.corrupt) / self._contrast()
 
 
 def _order(cases: list[TokenizedCase], batches: list[Batch]) -> list[int]:
@@ -363,6 +368,8 @@ class Experiment:
         tol = cfg.effect_atol + cfg.effect_rtol * np.abs(ref.patched[m])
         d_eff = np.abs(alt.effects[m] - ref.effects[m])
         d_rest = np.abs(alt.restoration()[m] - ref.restoration()[m])
+        undefined = int((~np.isfinite(alt.restoration()[m]).all(axis=1)).sum())
+        d_rest = d_rest[np.isfinite(d_rest)] if np.isfinite(d_rest).any() else np.array([np.nan])
         bitwise = (np.array_equal(alt.clean, ref.clean) and np.array_equal(alt.corrupt, ref.corrupt)
                    and np.array_equal(alt.patched, ref.patched))
         within = bool((d_patch <= tol).all()) and bool(
@@ -389,7 +396,7 @@ class Experiment:
             klass = "bitwise_identical"
         elif within:
             klass = "within_tolerance"
-        elif flips or (selection_changed and not ties["near_tie"]):
+        elif flips or undefined or (selection_changed and not ties["near_tie"]):
             klass = "decision_changing"
         else:
             klass = "exceeds_tolerance_no_decision_change"
@@ -401,6 +408,7 @@ class Experiment:
             mean_abs_patched_margin_diff=float(d_patch.mean()),
             max_abs_effect_diff=float(d_eff.max()),
             max_abs_restoration_diff=float(d_rest.max()),
+            cases_with_undefined_restoration=undefined,
             frac_entries_outside_tolerance=float((d_patch > tol).mean()),
             output_parity=asdict(parity) | {"passed_at_effect_atol": parity.passed} if parity else None,
             per_case_effect_spearman_min=float(min(per_case_rho)) if per_case_rho else None,
@@ -617,8 +625,11 @@ class Experiment:
             valid_rate = np.array([r["valid"] / max(r["proposals"], 1) for r in runs if r["strategy"] == strategy])
             lo, hi = (S.ci(np.random.default_rng(0).choice(vals, (2000, len(vals))).mean(1))
                       if len(vals) > 1 else (vals.mean(), vals.mean()))
+            best = [r["best_score"] for r in runs if r["strategy"] == strategy and r["best_score"] is not None]
             eff.append(dict(strategy=strategy, seeds=len(vals), cx_per_1k_mean=float(vals.mean()),
-                            cx_per_1k_ci95=[float(lo), float(hi)], valid_proposal_rate=float(valid_rate.mean())))
+                            cx_per_1k_ci95=[float(lo), float(hi)], valid_proposal_rate=float(valid_rate.mean()),
+                            lowest_restoration_per_seed=[b + pred.threshold for b in best],
+                            lowest_restoration_mean=float(np.mean(best)) + pred.threshold if best else None))
         # independent replay through a fresh evaluator (no cache)
         unique = {CX.key(r["axes"]): r for r in records}
         replayed = [CX.replay(r, fn) for r in unique.values()]

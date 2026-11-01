@@ -137,10 +137,19 @@ def fig_search(bundle, metrics) -> str | None:
     return "figures/search_efficiency.svg"
 
 
+def _cell(c) -> str:
+    return str(c).replace("|", "\\|").replace("\n", " ")
+
+
 def _table(headers, rows) -> str:
     out = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
-    out += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
+    out += ["| " + " | ".join(_cell(c) for c in r) + " |" for r in rows]
     return "\n".join(out)
+
+
+def _split_row(row: str) -> list[str]:
+    inner = row.strip()[1:-1] if row.strip().endswith("|") else row.strip()[1:]
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", inner)]
 
 
 def _f(x, nd=3):
@@ -227,7 +236,7 @@ def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
         L.append(f"- Top-{len(c['discovery_selected_top_k'])} blocks selected on discovery: "
                  f"{c['discovery_selected_top_k']}. Held-out joint restoration {_f(s['mean'])} "
                  f"[{_f(s['ci95_low'])}, {_f(s['ci95_high'])}], above "
-                 f"{_f(100 * (c['heldout_fidelity_percentile_vs_random'] or 0), 3)}% of "
+                 f"{100 * (c['heldout_fidelity_percentile_vs_random'] or 0):.0f}% of "
                  f"{len(c['heldout_fidelity_random_sets'])} random same-size block sets.")
         for row in c["claimed_vs_random"]:
             L.append(f"- Claimed blocks {row['components']} on {row['split']}: mean restoration "
@@ -253,7 +262,10 @@ def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
                          r["classification"], _f(r["max_abs_patched_margin_diff"]),
                          _f(par.get("max_abs_logit_diff")),
                          f"{r['discovery_top_k_condition']}{' (near tie)' if r['selection_near_tie'] else ''}",
-                         r["prediction_flips"] or "none"])
+                         (r["prediction_flips"] or "none")
+                         if not r.get("cases_with_undefined_restoration")
+                         else f"{r['prediction_flips'] or 'none'}; {r['cases_with_undefined_restoration']} "
+                              f"cases with zero contrast"])
         L.append(_table(["condition", "factor", "observed attention", "classification",
                          "max d patched margin", "max d clean logit", "discovery top-k", "prediction flips"], rows))
         L.append("")
@@ -287,11 +299,17 @@ def build_markdown(claim, verdict, metrics, manifest, figures) -> str:
         L.append("## Challenge: counterexample search\n")
         if figures.get("search"):
             L.append(f"![search]({figures['search']})\n")
-        L.append(_table(["strategy", "seeds", "counterexamples / 1k forwards", "95% CI", "valid proposal rate"],
+        L.append(_table(["strategy", "seeds", "counterexamples / 1k forwards", "95% CI", "valid proposal rate",
+                         "lowest restoration reached (mean over seeds)"],
                         [[e["strategy"], e["seeds"], _f(e["cx_per_1k_mean"]),
                           f"[{_f(e['cx_per_1k_ci95'][0])}, {_f(e['cx_per_1k_ci95'][1])}]",
-                          _f(e["valid_proposal_rate"])] for e in cx["efficiency"]]))
+                          _f(e["valid_proposal_rate"]), _f(e.get("lowest_restoration_mean"))]
+                         for e in cx["efficiency"]]))
         L.append("")
+        L.append(f"The claim's per-case threshold is {cx['threshold']}. The last column shows how close each "
+                 f"strategy pushed the claim towards failing within its budget of "
+                 f"{cx['runs'][0]['budget_forwards']} forwards per seed, which matters most when no "
+                 f"counterexample was found.\n")
         L.append("Counterexamples are drawn from the discovery axis space only. The holdout templates and "
                  "names are never searched.\n")
 
@@ -333,10 +351,10 @@ def markdown_to_html(md: str, title: str) -> str:
     def flush_table():
         if not table:
             return
-        head = [c.strip() for c in table[0].strip("|").split("|")]
+        head = _split_row(table[0])
         out.append("<table><thead><tr>" + "".join(f"<th>{inline(h)}</th>" for h in head) + "</tr></thead><tbody>")
         for row in table[2:]:
-            cells = [c.strip() for c in row.strip().strip("|").split("|")]
+            cells = _split_row(row)
             out.append("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in cells) + "</tr>")
         out.append("</tbody></table>")
         table.clear()

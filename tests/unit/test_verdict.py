@@ -88,3 +88,12 @@ def test_in_top_k():
     assert V.evaluate_prediction(p, d, 500, 0, 10).outcome == "pass"
     p0 = Prediction(id="p", kind="in_top_k", components=[0], k=1)
     assert V.evaluate_prediction(p0, d, 500, 0, 10).outcome == "fail"
+
+
+def test_undefined_restoration_is_never_a_pass():
+    """bf16 can make clean and corrupt margins identical; NaN must not count as passing."""
+    p = Prediction(id="p", kind="restoration_at_least", components=[0], threshold=0.5,
+                   quantifier="per_case", max_violation_rate=0.1)
+    vals = [0.9] * 39 + [float("nan")]
+    out = V.evaluate_prediction(p, _data(vals), 500, 0, 10)
+    assert out.outcome == "inconclusive" and out.stats["undefined"] == 1
