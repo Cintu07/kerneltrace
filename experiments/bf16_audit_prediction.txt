@@ -1,0 +1,12 @@
+predictions for scripts/bf16_audit.py, written and committed before it was run.
+48 ioi prompts per model, gpt-2 small, pythia-160m, pythia-410m, pythia-1b.
+
+1. fp32: the batch-shape gap is under 1e-3 on every prompt on every model.
+2. bf16: on gpt-2 the gap is 0.5 or more on at least a quarter of the prompts. on pythia
+   it is bigger, because pythia's logits are bigger and the bf16 grid is coarser there.
+3. bf16 with only the unembedding in fp32: the median gap is under 0.1 on every model.
+4. ranking mlp layers by mean restoration with the sweep batched, the top 3 under bf16
+   differ from fp32 on at least one of the four models. with the fp32 head they match
+   fp32 on all four.
+
+any of these can come out wrong. whatever happens goes in the readme.
