@@ -53,6 +53,10 @@ class ModelAdapter:
         """module whose output is the mlp hidden state after the nonlinearity."""
         raise NotImplementedError
 
+    def attention(self, layer: int) -> nn.Module:
+        """the whole attention block of one layer, projections included."""
+        raise NotImplementedError
+
     @property
     def d_mlp(self) -> int:
         raise NotImplementedError
@@ -90,6 +94,9 @@ class GPT2Adapter(ModelAdapter):
     def mlp_act(self, layer):
         return self.blocks()[layer].mlp.act
 
+    def attention(self, layer):
+        return self.blocks()[layer].attn
+
     @property
     def d_mlp(self):
         return self.blocks()[0].mlp.c_fc.weight.shape[1]
@@ -116,6 +123,9 @@ class GPTNeoXAdapter(ModelAdapter):
 
     def mlp_act(self, layer):
         return self.blocks()[layer].mlp.act
+
+    def attention(self, layer):
+        return self.blocks()[layer].attention
 
     @property
     def d_mlp(self):

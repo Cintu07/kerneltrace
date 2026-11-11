@@ -5,7 +5,7 @@ import torch
 
 from kerneltrace.interventions import patching as P
 
-from .conftest import fake_cases, tiny_gpt2
+from .conftest import fake_cases, tiny_gpt2, tiny_neox
 
 
 def test_identity_patch_is_exactly_null(gpt2, cases):
@@ -88,3 +88,52 @@ def test_neuron_attribution_matches_exact_patch_for_small_change(gpt2, cases):
     exact = P.neuron_patch_margins(gpt2, batch, 1, top)
     corrupt = P.margins(P.run(gpt2, batch.corrupt)[0], batch.a_ids, batch.b_ids).numpy()
     assert np.sign((exact - corrupt).mean()) == np.sign(scores[top.numpy()].sum())
+
+
+@pytest.mark.parametrize("make", [tiny_gpt2, tiny_neox])
+def test_fp32_logits_matches_the_normal_head_in_fp32(make, cases):
+    a = make()
+    batch = P.make_batches(cases, 8, "cpu")[0]
+    site = ("mlp_out", 1)
+    _, cache = P.run(a, batch.clean, capture=[site])
+    ref, _ = P.run(a, batch.corrupt, patches={site: P.Patch(cache[site])})
+    got, _ = P.run(a, batch.corrupt, patches={site: P.Patch(cache[site])}, fp32_logits=True)
+    assert got.dtype == torch.float32
+    torch.testing.assert_close(got, ref, atol=1e-5, rtol=1e-5)
+
+
+def test_fp32_logits_in_bf16_lands_closer_to_fp32():
+    """a bf16 body with an fp32 head should sit nearer the fp32 reference than plain bf16."""
+    ref_model = tiny_gpt2(seed=3)
+    low = tiny_gpt2(seed=3)
+    low.model.to(torch.bfloat16)
+    ids = torch.randint(4, 64, (4, 10), generator=torch.Generator().manual_seed(0))
+    ref, _ = P.run(ref_model, ids)
+    plain, _ = P.run(low, ids)
+    fixed, _ = P.run(low, ids, fp32_logits=True)
+    assert (fixed - ref).abs().max() <= (plain.float() - ref).abs().max()
+
+
+@pytest.mark.parametrize("make", [tiny_gpt2, tiny_neox])
+def test_upcast_attention_runs_attention_in_fp32_and_hands_back_bf16(make, cases):
+    from kerneltrace.models.precision import upcast_attention
+
+    a = make()
+    a.model.to(torch.bfloat16)
+    seen = []
+    upcast_attention(a)
+    a.attention(0).register_forward_hook(lambda _m, i, o: seen.append(next(p.dtype for p in _m.parameters())))
+    batch = P.make_batches(cases, 8, "cpu")[0]
+    logits, cache = P.run(a, batch.corrupt, capture=[("mlp_out", 0)])
+    assert seen == [torch.float32]
+    assert cache[("mlp_out", 0)].dtype == torch.bfloat16
+    assert torch.isfinite(logits.float()).all()
+
+
+def test_upcast_attention_is_a_no_op_in_fp32(cases):
+    from kerneltrace.models.precision import upcast_attention
+
+    a, b = tiny_neox(seed=4), tiny_neox(seed=4)
+    upcast_attention(b)
+    batch = P.make_batches(cases, 8, "cpu")[0]
+    assert torch.equal(P.run(a, batch.corrupt)[0], P.run(b, batch.corrupt)[0])

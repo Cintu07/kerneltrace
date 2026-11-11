@@ -66,9 +66,28 @@ def _patch_hook(site: Site, patch: Patch):
     return hook
 
 
+def fp32_unembed(adapter: ModelAdapter, input_ids: torch.Tensor) -> torch.Tensor:
+    """logits with the body in the model's own dtype and only the unembedding in fp32.
+
+    in bf16 the logits come out rounded to the bf16 grid, and around gpt-2's ~140
+    that grid steps by 0.5. a logit diff of 3 then moves in sixths. doing the last
+    matmul in fp32 keeps the cheap body and drops that rounding.
+    """
+    h = adapter.model.base_model(input_ids=input_ids).last_hidden_state
+    head = adapter.model.get_output_embeddings()
+    w = getattr(adapter, "_unembed_fp32", None)
+    if w is None:
+        w = adapter._unembed_fp32 = head.weight.detach().float()
+    logits = h.float() @ w.T
+    if getattr(head, "bias", None) is not None:
+        logits = logits + head.bias.float()
+    return logits
+
+
 @torch.no_grad()
 def run(adapter: ModelAdapter, input_ids: torch.Tensor, capture: list[Site] = (),
-        patches: dict[Site, Patch] | None = None) -> tuple[torch.Tensor, dict[Site, torch.Tensor]]:
+        patches: dict[Site, Patch] | None = None,
+        fp32_logits: bool = False) -> tuple[torch.Tensor, dict[Site, torch.Tensor]]:
     """one forward pass, capturing and/or patching sites. returns logits and captures."""
     patches = patches or {}
     store: dict[Site, torch.Tensor] = {}
@@ -76,7 +95,8 @@ def run(adapter: ModelAdapter, input_ids: torch.Tensor, capture: list[Site] = ()
     # capture hooks go after patch hooks so they see the patched value.
     pairs += [(site_module(adapter, s), _capture_hook(store, s)) for s in capture]
     with _hooks(pairs):
-        logits = adapter.model(input_ids=input_ids).logits
+        logits = (fp32_unembed(adapter, input_ids) if fp32_logits
+                  else adapter.model(input_ids=input_ids).logits)
     for s, p in patches.items():
         if p.fired != 1:
             raise RuntimeError(f"patch at {s} fired {p.fired} times, expected 1")
