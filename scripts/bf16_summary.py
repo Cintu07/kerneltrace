@@ -13,7 +13,8 @@ import numpy as np
 
 DIR = Path("evidence/bf16_audit")
 ORDER = ("gpt2", "pythia-160m", "pythia-410m", "pythia-1b")
-SETTINGS = ("fp32", "bf16", "bf16 + fp32 head", "bf16 + fp32 attention and head")
+SETTINGS = ("fp32", "bf16", "bf16 + fp32 head", "bf16 + fp32 attention and head",
+            "bf16, key bias dropped", "bf16, key bias dropped + fp32 head")
 
 
 def step(x):
@@ -71,7 +72,7 @@ def main():
               f"bf16 step there {r['bf16_step_at_answer_logit']}  median contrast {r['median_contrast']:.2f}")
         for label in SETTINGS:
             s = r["settings"][label]
-            print(f"  {label:30s} batch gap med {s['batch_gap_median']:.3f} max {s['batch_gap_max']:.3f} "
+            print(f"  {label:34s} batch gap med {s['batch_gap_median']:.3f} max {s['batch_gap_max']:.3f} "
                   f">=.25 {s['batch_gap_share_ge_0.25']:.0%} | zero effect {s['zero_contrast_prompts']} | sweep err med {s['restore_err_sweep_median']:.3f} "
                   f"p95 {s['restore_err_sweep_p95']:.3f} max {s['restore_err_sweep_max']:.3f} | same-shape err med "
                   f"{s['restore_err_same_median']:.3f} | top3 sweep {s['top3_sweep']} same {s['top3_same']} | "

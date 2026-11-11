@@ -31,7 +31,7 @@ import torch
 from kerneltrace.core.manifest import configure_determinism, environment
 from kerneltrace.interventions.patching import Patch, margins, run
 from kerneltrace.models.adapter import load, load_tokenizer
-from kerneltrace.models.precision import upcast_attention
+from kerneltrace.models.precision import drop_invariant_key_bias, upcast_attention
 from kerneltrace.tasks import ioi
 from kerneltrace.tasks.preflight import behavioural_check, single_token, structural_check
 
@@ -41,9 +41,12 @@ MODELS = {
     "pythia-410m": ("EleutherAI/pythia-410m", "9879c9b5f8bea9051dcb0e68dff21493d67e9d4f"),
     "pythia-1b": ("EleutherAI/pythia-1b", "f73d7dcc545c8bd326d8559c8ef84ffe92fea6b2"),
 }
-SETTINGS = (("fp32", "float32", False, False), ("bf16", "bfloat16", False, False),
-            ("bf16 + fp32 head", "bfloat16", True, False),
-            ("bf16 + fp32 attention and head", "bfloat16", True, True))
+# label, dtype, fp32 head, fp32 attention, invariant key bias dropped
+SETTINGS = (("fp32", "float32", False, False, False), ("bf16", "bfloat16", False, False, False),
+            ("bf16 + fp32 head", "bfloat16", True, False, False),
+            ("bf16 + fp32 attention and head", "bfloat16", True, True, False),
+            ("bf16, key bias dropped", "bfloat16", False, False, True),
+            ("bf16, key bias dropped + fp32 head", "bfloat16", True, False, True))
 OUT = Path("evidence/bf16_audit")
 
 
@@ -139,7 +142,7 @@ def audit(name, n):
     result = (json.loads(path.read_text(encoding="utf-8")) if path.exists()
               else {"model": model_id, "revision": rev, "settings": {}, "prompts": []})
     cases = None
-    for label, dtype, fp32_logits, fp32_attention in SETTINGS:
+    for label, dtype, fp32_logits, fp32_attention, drop_bias in SETTINGS:
         if label in result["settings"] and len(result["settings"][label]["rows"]) == n:
             continue
         if cases is None:  # chosen on the fp32 reference, then held fixed
@@ -150,6 +153,8 @@ def audit(name, n):
         adapter = load(model_id, rev, "eager", dtype, "cuda")
         if fp32_attention:
             upcast_attention(adapter)
+        if drop_bias:
+            drop_invariant_key_bias(adapter)
         if not result["prompts"]:
             result["prompts"] = [{"case_id": c.case.case_id, "corrupt": c.case.corrupt,
                                   "answer": c.case.answer.strip(), "distractor": c.case.distractor.strip()}
@@ -158,10 +163,11 @@ def audit(name, n):
         t0 = time.time()
         rows = [measure(adapter, c, fp32_logits) for c in cases]
         result["settings"][label] = {"dtype": dtype, "fp32_logits": fp32_logits,
-                                     "fp32_attention": fp32_attention, "rows": rows,
+                                     "fp32_attention": fp32_attention,
+                                     "drop_key_bias": drop_bias, "rows": rows,
                                      "seconds": round(time.time() - t0, 1)}
         gaps = [abs(r["corrupt"] - r["corrupt_batched"]) for r in rows]
-        print(f"{name:12s} {label:30s} prompts {len(rows)}  batch gap median {np.median(gaps):.4f} "
+        print(f"{name:12s} {label:34s} prompts {len(rows)}  batch gap median {np.median(gaps):.4f} "
               f"max {max(gaps):.4f}  answer logit ~{np.median([r['answer_logit'] for r in rows]):.0f}", flush=True)
         del adapter
         gc.collect()
