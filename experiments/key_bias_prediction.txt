@@ -1,0 +1,17 @@
+predictions for the key bias follow-up, written and committed before running it.
+
+what is known already: in pythia-160m and 410m the giant attention offsets come from the
+key bias, and the big part of that bias sits in the dimensions that rotary embeddings do
+not touch. there it adds the same number to every key's score, so softmax removes it and
+it gets no gradient in exact arithmetic. zeroing that part should be an exact no-op.
+
+1. zeroing the non-rotary key bias moves the fp32 logits by less than 0.05 anywhere in the
+   vocabulary, on every prompt, on all three pythia models.
+2. after zeroing it, plain bf16 (no fp32 parts at all) gets the mlp patching sweep on
+   pythia-160m within 0.02 median of fp32, and the top 3 layers match fp32.
+3. same for pythia-410m.
+4. pythia-160m still loses the effect on more than 10 of 48 prompts in plain bf16 after
+   the zeroing, because its output logits are still near 836. with the fp32 head as well,
+   on none.
+5. across pythia-160m's training checkpoints, the non-rotary key bias norm only grows. it
+   is below 20 at step 1000 and above 200 by the end.
