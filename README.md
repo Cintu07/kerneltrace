@@ -42,7 +42,7 @@ adapter = upcast_attention(load(model_id, revision, "eager", "bfloat16", "cuda")
 logits, _ = run(adapter, ids, patches=..., fp32_logits=True)
 ```
 
-the predictions were written down and committed before the run, in `experiments/bf16_audit_prediction.txt`. two held and four didn't. fp32 wasn't perfectly batch-stable on pythia-160m, which drifts by up to 0.007 because its logits are so big. gpt-2 jumped by 0.5 on 10 prompts, short of the quarter i guessed. pythia's typical bf16 jump was smaller than gpt-2's, because a grid of 4 swallows most of the drift and then jumps by 4 or 8 on 5 prompts. and the fp32 head alone didn't fix pythia, because the problem was never the head.
+the predictions were written down and committed before the run, in `experiments/bf16_audit_prediction.txt`. two held and four didn't. fp32 wasn't perfectly batch-stable on pythia-160m, which drifts by up to 0.007 because its logits are so big. gpt-2 jumped by 0.5 on 10 prompts, short of the quarter i guessed. pythia's jumps weren't bigger either. on most prompts neither model moved, and fewer pythia-160m prompts jumped than gpt-2 prompts, 5 against 12, because a grid of 4 swallows small drift and then lets go by 4 or 8. and the fp32 head alone didn't fix pythia, because the problem was never the head.
 
 ## where the offsets come from
 
