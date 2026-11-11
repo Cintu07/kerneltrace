@@ -15,3 +15,10 @@ it gets no gradient in exact arithmetic. zeroing that part should be an exact no
    on none.
 5. across pythia-160m's training checkpoints, the non-rotary key bias norm only grows. it
    is below 20 at step 1000 and above 200 by the end.
+
+added before running the next two, after 1 to 4 had been checked:
+
+6. pythia-160m in fp16 gives non-finite logits on most audit prompts, because its attention
+   scores pass fp16's largest value of 65,504. with the key bias dropped, all finite.
+7. on wikitext-2 test text, pythia-160m's perplexity in bf16 is more than 1% worse than fp32.
+   with the key bias dropped, bf16 lands within 0.5% of fp32.
