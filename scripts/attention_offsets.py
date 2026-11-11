@@ -7,7 +7,8 @@ the step is bigger than the spread, the pattern in bf16 is set by rounding.
 
 gpt-neox models only, since it hooks their eager attention function.
 usage: python scripts/attention_offsets.py
-writes evidence/bf16_audit/attention_offsets.json
+writes evidence/bf16_audit/attention_offsets.json, plus one worked example row in
+evidence/bf16_audit/attention_example.json
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ MODELS = {
     "pythia-1b": ("EleutherAI/pythia-1b", "f73d7dcc545c8bd326d8559c8ef84ffe92fea6b2"),
 }
 OUT = Path("evidence/bf16_audit/attention_offsets.json")
+EXAMPLE = Path("evidence/bf16_audit/attention_example.json")
 
 
 def bf16_step(x):
@@ -66,9 +68,40 @@ def offsets(name):
     return {"model": model_id, "revision": rev, "n_prompts": len(prompts), "layers": layers}
 
 
+def example(name="pythia-160m", layer=10, prompt=0):
+    """one query's scores in the worst head of one layer, before and after bf16 rounding."""
+    model_id, rev = MODELS[name]
+    tok = load_tokenizer(model_id, rev)
+    text = json.loads(Path(f"evidence/bf16_audit/{name}.json").read_text(encoding="utf-8"))["prompts"][prompt]["corrupt"]
+    ids = tok.encode(text)
+    model = load(model_id, rev, "eager", "float32", "cuda").model
+    got = {}
+    original = neox.eager_attention_forward
+
+    def spy(module, query, key, value, attention_mask, scaling, **kw):
+        if module.layer_idx == layer:
+            row = (torch.matmul(query, key.transpose(2, 3)) * scaling)[0, :, -1, :]
+            h = int(row.mean(-1).abs().argmax())
+            rounded = row[h].to(torch.bfloat16).float()
+            got.update(head=h, scores=row[h].tolist(), scores_bf16=rounded.tolist(),
+                       attention=torch.softmax(row[h], -1).tolist(),
+                       attention_bf16=torch.softmax(rounded, -1).tolist())
+        return original(module, query, key, value, attention_mask, scaling, **kw)
+
+    neox.eager_attention_forward = spy
+    try:
+        with torch.no_grad():
+            model(input_ids=torch.tensor([ids], device="cuda"))
+    finally:
+        neox.eager_attention_forward = original
+    return {"model": model_id, "revision": rev, "layer": layer, "prompt": text,
+            "tokens": [tok.decode([t]) for t in ids], **got}
+
+
 def main():
     configure_determinism(0, True)
-    result = {name: offsets(name) for name in MODELS}
+    EXAMPLE.write_text(json.dumps(example(), indent=1), encoding="utf-8", newline="\n")
+    result ={name: offsets(name) for name in MODELS}
     for name, r in result.items():
         bad = [x for x in r["layers"] if x["bf16_step"] > x["spread"]]
         peak = max(r["layers"], key=lambda x: x["offset"])

@@ -22,15 +22,39 @@ the causal trace shows where the answer lives. restore one activation at one wor
 
 at fp32, swapping attention kernels or batch size moved the measurements by 2e-4 logits at most. bf16 changed which blocks rank top three, and 31% of the trace cells moved by 0.05 or more from rounding alone.
 
+## bf16 can decide what patching tells you
+
+that last result got its own audit. four models, 48 ioi prompts each, and the same mlp patching sweep run in fp32, in bf16, in bf16 with only the unembedding in fp32, and in bf16 with attention and the unembedding in fp32. fp32 is the reference.
+
+![one attention head in bf16](docs/figures/x_bf16_head.png)
+
+pythia-160m is the bad one. on 25 of the 48 prompts the clean and corrupted logit diffs come out identical in bf16, so there's no effect left to patch. its answer logits sit near 836, and bf16 only has values every 4 out there. on the prompts that survive, bf16 says mlp layer 4 brings back 43% of the answer. fp32 says 3%.
+
+an fp32 head doesn't save it. the damage is inside attention. from layer 3 on, pythia-160m adds a huge offset to every attention score of a query, the same for every key, up to 115,448 in layer 11. softmax subtracts it back out, so in exact math it does nothing. but the part that's left, the spread between keys that decides where a head looks, is 20 to 100. bf16 steps by 256 or 512 at that size. in the head above, every score rounds to 35,584 and attention that was 86% on one word turns into 7% on all of them.
+
+![what bf16 does to patching](docs/figures/x_bf16_audit.png)
+
+running attention in fp32 and the rest in bf16 fixes it on all four models. median error drops to 0.003 to 0.007, and the top 3 layers match fp32 on every pythia model. on gpt-2 the third place swaps between layers 9 and 11, which tie at 0.031 in fp32 anyway. pythia-410m has the same offsets (up to 36,654) and loses its layer 5 effect in bf16. pythia-1b doesn't have them (largest is 52) and bf16 is fine there, so it isn't about size. `scripts/attention_offsets.py` measures the offsets before you run anything. gpt-2 small has a smaller problem in its logits, which bf16 rounds to steps of 0.5, and an fp32 head alone handles that.
+
+```python
+from kerneltrace.models.precision import upcast_attention
+adapter = upcast_attention(load(model_id, revision, "eager", "bfloat16", "cuda"))
+logits, _ = run(adapter, ids, patches=..., fp32_logits=True)
+```
+
+the predictions were written down and committed before the run, in `experiments/bf16_audit_prediction.txt`. two held and four didn't. fp32 wasn't perfectly batch-stable on pythia-160m, which drifts by up to 0.007 because its logits are so big. gpt-2 jumped by 0.5 on 10 prompts, short of the quarter i guessed. pythia's typical bf16 jump was smaller than gpt-2's, because a grid of 4 swallows most of the drift and then jumps by 4 or 8 on 5 prompts. and the fp32 head alone didn't fix pythia, because the problem was never the head.
+
 ## run it
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128   # pick the build for your gpu
 pip install -e ".[dev]"
-pytest -q                                          # 62 tests, cpu only, no downloads
+pytest -q                                          # 68 tests, cpu only, no downloads
 kerneltrace run experiments/gpt2_ioi_mlp0.yaml     # about 6 minutes on an 8 gb laptop gpu
 kerneltrace replay evidence/<bundle>               # rerun a bundle and compare it to what was stored
 python scripts/causal_trace.py 24                  # the traces behind the picture above
+python scripts/bf16_batch_check.py                 # one prompt, two batch sizes, the 0.5 jump
+python scripts/bf16_audit.py && python scripts/bf16_summary.py   # the bf16 audit, about 15 minutes
 ```
 
 a run writes a folder under `runs/`. inside is the manifest (model commit, library and driver versions, gpu, tf32 and determinism switches, git state), the claim with its final status, every generated prompt with the reason any were rejected, raw per-case results, the kernels the profiler saw, and a report.
@@ -41,6 +65,6 @@ a run writes a folder under `runs/`. inside is the manifest (model commit, libra
 
 the status rules live in `kerneltrace/core/verdict.py`. short version: a failed gate means inconclusive. an interval on the wrong side of its threshold means falsified. an untested invariance means inconclusive. a valid attack that changes a decision means challenged.
 
-some limits. one task family, mlp blocks only, two small models. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
+some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
 
 mit license.

@@ -293,6 +293,127 @@ def noise():
     save("x_noise", E)
 
 
+# --- bf16: one attention head, and what it does to patching
+def bf16_head():
+    e = json.loads((EV / "bf16_audit" / "attention_example.json").read_text(encoding="utf-8"))
+    E = [text(40, 26, "in bf16, this attention head stops looking anywhere", 34, INK),
+         text(42, 78, f"pythia-160m, layer {e['layer']}, head {e['head']}, reading the last word of an ioi prompt. "
+                      "the same scores, rounded to bf16.", 18, GREY)]
+    top, rh = 176, 34
+    cols = {"tok": 40, "score": 200, "bf": 350, "a32": 490, "a16": 830}
+    bar_w = 280
+    E.append(text(cols["score"], top - 44, "score", 18, GREY, font=CODE))
+    E.append(text(cols["bf"], top - 44, "in bf16", 18, GREY, font=CODE))
+    E.append(text(cols["a32"], top - 44, "attention, fp32", 20, BLUE))
+    E.append(text(cols["a16"], top - 44, "attention, bf16", 20, INK))
+    for i, (t, sc, sb, a, b) in enumerate(zip(e["tokens"], e["scores"], e["scores_bf16"], e["attention"],
+                                               e["attention_bf16"])):
+        y = top + i * rh
+        E.append(text(cols["tok"], y + 4, t.strip() or "_", 18, INK, align="right", w=140, font=CODE))
+        E.append(text(cols["score"], y + 4, f"{sc:,.0f}", 18, INK, font=CODE))
+        E.append(text(cols["bf"], y + 4, f"{sb:,.0f}", 18, GREY, font=CODE))
+        for x0, v, fill, stroke, style in ((cols["a32"], a, BLUE, BLUE, "solid"),
+                                           (cols["a16"], b, RULE, GREY, "hachure")):
+            E.append(line([(x0, y + 2), (x0, y + rh - 6)], RULE, 1))
+            if v >= 0.004:
+                E.append(rect(x0, y + 4, max(v * bar_w, 3), rh - 12, backgroundColor=fill, strokeColor=stroke,
+                              fillStyle=style, roundness=None, strokeWidth=1))
+            if v >= 0.05:
+                E.append(text(x0 + v * bar_w + 8, y + 5, f"{v:.0%}", 16, INK, font=CODE))
+    bottom = top + len(e["tokens"]) * rh
+    # number line: the whole row sits inside one bf16 step
+    lx, rx, lo, hi = 1180, 1520, 35300, 35900
+    X = lambda v: lx + (v - lo) * (rx - lx) / (hi - lo)
+    ny = 300
+    E.append(text(lx, 140, "why", 26, INK))
+    E.append(line([(lx, ny), (rx, ny)], INK, 2))
+    for g in (35328, 35584, 35840):
+        E.append(line([(X(g), ny - 12), (X(g), ny + 12)], INK, 2))
+        E.append(text(X(g) - 40, ny + 18, f"{g:,}", 15, GREY, align="center", w=80, font=CODE))
+    s_lo, s_hi = min(e["scores"]), max(e["scores"])
+    E.append(line([(X(s_lo), ny - 26), (X(s_hi), ny - 26)], BLUE, 8))
+    E.append(line([(X(s_lo) - 2, ny - 32), (X(35584) + 4, ny - 8)], BLUE, 2, arrow=True))
+    E.append(text(lx, ny - 96, f"the 14 scores, all between\n{s_lo:,.0f} and {s_hi:,.0f}", 17, BLUE))
+    E.append(text(lx, ny + 56, "bf16 can only land on the ticks\nout here, 256 apart. every score\n"
+                               "rounds to the same one.\n\nsoftmax ignores the shared 35,600\n"
+                               "anyway. the 20 left over is what\ndecides where the head looks, and\n"
+                               "bf16 can't hold it.", 18, INK))
+    a0 = e["attention"][0]
+    E.append(text(40, bottom + 26, f"{a0:.0%} of the attention on '{e['tokens'][0].strip()}' turns into "
+                                   f"{e['attention_bf16'][0]:.0%} on every word. "
+                                   "running attention in fp32 brings it back.", 22, INK))
+    E.append(text(40, bottom + 66, "github.com/Cintu07/kerneltrace   scripts/attention_offsets.py", 17, GREY, font=CODE))
+    save("x_bf16_head", E)
+
+
+def bf16_audit():
+    summ = json.loads((EV / "bf16_audit" / "summary.json").read_text(encoding="utf-8"))["models"]
+    offs = json.loads((EV / "bf16_audit" / "attention_offsets.json").read_text(encoding="utf-8"))
+    raw = json.loads((EV / "bf16_audit" / "pythia-160m.json").read_text(encoding="utf-8"))["settings"]
+
+    def means(label):
+        cols = list(zip(*[r["restore_sweep_batched"] for r in raw[label]["rows"]]))
+        return [sum(v for v in c if v == v) / max(1, sum(1 for v in c if v == v)) for c in cols]
+
+    m32, m16, mfix = means("fp32"), means("bf16"), means("bf16 + fp32 attention and head")
+    zero = summ["pythia-160m"]["settings"]["bf16"]["zero_contrast_prompts"]
+    E = [text(40, 26, "what that does to activation patching", 34, INK),
+         text(42, 78, "patch the clean mlp output of one layer into the corrupted run, 48 ioi prompts per model", 18, GREY)]
+    # left: pythia-160m, mean restoration per mlp layer, layers 1 to 11
+    base_y, scale, bw, gap = 540, 560, 22, 64
+    x0 = 90
+    E.append(text(40, 140, "pythia-160m: which mlp layer brings the answer back?", 22, INK))
+    E.append(text(40, 172, "fp32", 18, BLUE))
+    E.append(text(100, 172, "bf16", 18, GREY))
+    E.append(text(160, 172, f"(bf16 leaves out the {zero} prompts where it sees no effect at all)", 16, GREY))
+    for g in (0.25, 0.5):
+        y = base_y - g * scale
+        E.append(line([(x0 - 10, y), (x0 + 11 * gap, y)], RULE, 1, dashed=True))
+        E.append(text(x0 - 56, y - 10, f"{g:.2f}", 15, GREY, font=CODE))
+    for i in range(1, 12):
+        x = x0 + (i - 1) * gap
+        for dx, v, fill, stroke, style in ((0, m32[i], BLUE, BLUE, "solid"), (bw + 2, m16[i], RULE, GREY, "hachure")):
+            h = abs(v) * scale
+            y = base_y - h if v >= 0 else base_y
+            E.append(rect(x + dx, y, bw, max(h, 2), backgroundColor=fill, strokeColor=stroke, fillStyle=style,
+                          roundness=None, strokeWidth=1))
+        E.append(text(x, base_y + 52, str(i), 16, GREY, align="center", w=2 * bw + 2))
+    E.append(line([(x0 - 10, base_y), (x0 + 11 * gap, base_y)], INK, 2))
+    E.append(text(x0 + 3 * gap + 60, base_y - m16[4] * scale - 10,
+                  f"bf16 says layer 4\nbrings back {m16[4]:.0%}.\nfp32 says {m32[4]:.0%}.", 17, INK))
+    fix_gap = max(abs(a - b) for a, b in zip(m32, mfix))
+    E.append(text(40, base_y + 84, f"mlp layer. layer 0 is left off the chart: {m32[0]:.2f} in fp32, {m16[0]:.2f} in bf16.\n"
+                                   f"with attention in fp32, every layer lands within {fix_gap:.3f} of fp32.", 17, GREY))
+    # right: all four models
+    tx = 900
+    E.append(text(tx, 140, "all four models", 22, INK))
+    head = ["", "largest\nattention offset", "error\nin bf16", "error with\nfp32 attention", "top 3\nlayers"]
+    cx = [tx, tx + 160, tx + 330, tx + 440, tx + 600]
+    for c, h in zip(cx, head):
+        E.append(text(c, 186, h, 15, GREY))
+    names = [("gpt2", "gpt-2 small"), ("pythia-160m", "pythia-160m"), ("pythia-410m", "pythia-410m"),
+             ("pythia-1b", "pythia-1b")]
+    for r, (key, label) in enumerate(names):
+        y = 250 + r * 56
+        st = summ[key]["settings"]
+        off = f"{max(l['offset'] for l in offs[key]['layers']):,.0f}" if key in offs else "n/a"
+        wrong = st["bf16"]["top3_sweep"] != st["fp32"]["top3_sweep"]
+        bad = st["bf16"]["restore_err_sweep_median"] > 0.05
+        E.append(text(cx[0], y, label, 19, INK))
+        E.append(text(cx[1], y, off, 18, INK, font=CODE))
+        E.append(text(cx[2], y, f"{st['bf16']['restore_err_sweep_median']:.3f}", 18, BLUE if bad else INK, font=CODE))
+        E.append(text(cx[3], y, f"{st['bf16 + fp32 attention and head']['restore_err_sweep_median']:.3f}", 18, INK,
+                      font=CODE))
+        E.append(text(cx[4], y, "changed" if wrong else "same", 18, BLUE if wrong else GREY))
+        E.append(line([(tx, y + 40), (tx + 680, y + 40)], RULE, 1))
+    E.append(text(tx, 490, "error is the median distance from the fp32 restoration, over\n"
+                           "every prompt and layer. on gpt-2 small the bf16 error is mostly\n"
+                           "the logits, rounded to steps of 0.5. an fp32 head alone gets 0.006.\n\n"
+                           "pythia-1b is bigger than 410m and fine. size doesn't decide it.\n"
+                           "the offsets do, and you can measure them before you patch.", 17, INK))
+    save("x_bf16_audit", E)
+
+
 # --- the readme diagram: tall enough to read at github's column width
 def method():
     W = 1100
@@ -347,9 +468,8 @@ def method():
 
 
 if __name__ == "__main__":
-    method()
-    verdicts()
-    trace()
-    numerical()
-    shuffle()
-    noise()
+    import sys
+
+    figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit)}
+    for name in sys.argv[1:] or figures:
+        figures[name]()
