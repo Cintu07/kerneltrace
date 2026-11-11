@@ -10,7 +10,9 @@ part get. the invariant part gets no gradient in exact arithmetic.
 
 suite: the same numbers for the final checkpoint of every pythia size, 70m to 12b.
 
-usage: python scripts/key_bias.py [parity] [training] [suite]
+prescale: why pythia-1.4b still overflows fp16 with the bias dropped.
+
+usage: python scripts/key_bias.py [parity] [training] [suite] [prescale]
 writes evidence/bf16_audit/key_bias.json
 """
 from __future__ import annotations
@@ -151,6 +153,41 @@ def suite():
     return out
 
 
+def prescale(model_id="EleutherAI/pythia-1.4b", rev="fedc38a16eea3bd36a96b906d78d11d2ce18ed79"):
+    """with the bias dropped, how big does q . k get before the attention code scales it?
+
+    the eager attention multiplies q by k first and scales after, so in fp16 that raw product
+    is what has to fit under 65,504. measured in fp32 on the first wikitext window.
+    """
+    import transformers.models.gpt_neox.modeling_gpt_neox as neox
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from lm_quality import WINDOW, wikitext
+
+    tok = load_tokenizer(model_id, rev)
+    ids = torch.tensor([tok.encode(wikitext()[:40_000])[:WINDOW]], device="cuda")
+    adapter = load(model_id, rev, "eager", "float32", "cuda")
+    drop_invariant_key_bias(adapter)
+    seen = {"raw": 0.0, "scaled": 0.0}
+    original = neox.eager_attention_forward
+
+    def spy(module, query, key, value, attention_mask, scaling, **kw):
+        raw = torch.matmul(query, key.transpose(2, 3))
+        seen["raw"] = max(seen["raw"], float(raw.abs().max()))
+        seen["scaled"] = max(seen["scaled"], float((raw * scaling).abs().max()))
+        return original(module, query, key, value, attention_mask, scaling, **kw)
+
+    neox.eager_attention_forward = spy
+    try:
+        with torch.no_grad():
+            adapter.model(input_ids=ids)
+    finally:
+        neox.eager_attention_forward = original
+    print(f"{model_id} with the bias dropped: largest q.k before scaling {seen['raw']:,.0f}, "
+          f"after {seen['scaled']:,.0f} (fp16 tops out at 65,504)", flush=True)
+    return {"model": model_id, "revision": rev, "max_raw_qk": seen["raw"], "max_scaled_score": seen["scaled"]}
+
+
 def main(parts):
     configure_determinism(0, True)
     result = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
@@ -158,6 +195,8 @@ def main(parts):
         result["parity"] = {name: parity(name) for name in MODELS}
     if "suite" in parts:
         result["suite"] = suite()
+    if "prescale" in parts:
+        result["prescale"] = prescale()
     if "training" in parts:
         result["training"] = {"model": "EleutherAI/pythia-160m", "steps": training()}
     OUT.write_text(json.dumps(result, indent=1), encoding="utf-8", newline="\n")
@@ -165,4 +204,4 @@ def main(parts):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or ["parity", "training", "suite"])
+    main(sys.argv[1:] or ["parity", "training", "suite", "prescale"])

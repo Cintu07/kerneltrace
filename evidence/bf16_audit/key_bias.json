@@ -1720,5 +1720,11 @@
     }
    ]
   }
+ },
+ "prescale": {
+  "model": "EleutherAI/pythia-1.4b",
+  "revision": "fedc38a16eea3bd36a96b906d78d11d2ce18ed79",
+  "max_raw_qk": 129160.203125,
+  "max_scaled_score": 11416.2568359375
  }
 }
