@@ -137,3 +137,34 @@ def test_upcast_attention_is_a_no_op_in_fp32(cases):
     upcast_attention(b)
     batch = P.make_batches(cases, 8, "cpu")[0]
     assert torch.equal(P.run(a, batch.corrupt)[0], P.run(b, batch.corrupt)[0])
+
+
+@pytest.mark.parametrize("make", [tiny_gpt2, tiny_neox])
+def test_dropping_the_invariant_key_bias_leaves_logits_alone(make, cases):
+    from kerneltrace.models.precision import drop_invariant_key_bias
+
+    a = make(seed=5)
+    with torch.no_grad():
+        for layer in range(a.n_layers):
+            a.invariant_key_bias(layer).normal_(0, 30.0)  # big, like pythia's
+    batch = P.make_batches(cases, 8, "cpu")[0]
+    before, _ = P.run(a, batch.corrupt)
+    removed = drop_invariant_key_bias(a)
+    after, _ = P.run(a, batch.corrupt)
+    assert removed > 50
+    for layer in range(a.n_layers):
+        assert not a.invariant_key_bias(layer).any()
+    torch.testing.assert_close(after, before, atol=1e-3, rtol=1e-4)
+
+
+def test_the_rest_of_the_neox_key_bias_is_not_invariant(cases):
+    """the rotary part of the key bias does change attention, so it has to stay."""
+    a = tiny_neox(seed=6)
+    attn = a.attention(0)
+    heads, size = a.config.num_attention_heads, a.config.hidden_size // a.config.num_attention_heads
+    batch = P.make_batches(cases, 8, "cpu")[0]
+    before, _ = P.run(a, batch.corrupt)
+    with torch.no_grad():
+        attn.query_key_value.bias.view(heads, 3, size)[:, 1, :attn.rotary_ndims].normal_(0, 30.0)
+    after, _ = P.run(a, batch.corrupt)
+    assert (after - before).abs().max() > 1e-2

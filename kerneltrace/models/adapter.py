@@ -57,6 +57,15 @@ class ModelAdapter:
         """the whole attention block of one layer, projections included."""
         raise NotImplementedError
 
+    def invariant_key_bias(self, layer: int) -> torch.Tensor:
+        """the part of a layer's key bias that softmax cannot see.
+
+        it adds q . b to the score of every key a query looks at, the same number for
+        all of them, so softmax subtracts it out. returns a view, so writes land in the
+        weights.
+        """
+        raise NotImplementedError
+
     @property
     def d_mlp(self) -> int:
         raise NotImplementedError
@@ -97,6 +106,11 @@ class GPT2Adapter(ModelAdapter):
     def attention(self, layer):
         return self.blocks()[layer].attn
 
+    def invariant_key_bias(self, layer):
+        # c_attn packs [q | k | v] along the output. there is no rotary, so all of k's bias is invariant.
+        d = self.config.n_embd
+        return self.blocks()[layer].attn.c_attn.bias[d:2 * d]
+
     @property
     def d_mlp(self):
         return self.blocks()[0].mlp.c_fc.weight.shape[1]
@@ -126,6 +140,14 @@ class GPTNeoXAdapter(ModelAdapter):
 
     def attention(self, layer):
         return self.blocks()[layer].attention
+
+    def invariant_key_bias(self, layer):
+        # query_key_value packs [q | k | v] per head. rotary turns the first rotary_ndims
+        # of each key with its position, so only the rest of the bias is the same for every key.
+        attn = self.attention(layer)
+        heads = self.config.num_attention_heads
+        head_size = self.config.hidden_size // heads
+        return attn.query_key_value.bias.view(heads, 3, head_size)[:, 1, attn.rotary_ndims:]
 
     @property
     def d_mlp(self):
