@@ -22,3 +22,11 @@ added before running the next two, after 1 to 4 had been checked:
    scores pass fp16's largest value of 65,504. with the key bias dropped, all finite.
 7. on wikitext-2 test text, pythia-160m's perplexity in bf16 is more than 1% worse than fp32.
    with the key bias dropped, bf16 lands within 0.5% of fp32.
+
+added before surveying the rest of the pythia suite, after 5 to 7 had been checked:
+
+8. reading only the final checkpoints of pythia 70m, 1.4b, 2.8b, 6.9b and 12b, at least one
+   of them besides 160m and 410m has an invariant key bias norm above 100.
+9. every pythia model small enough to run here (70m and 1.4b besides the ones above) gives
+   nan perplexity in fp16 if its invariant key bias norm is above 100, and finite if it is
+   under 30.
