@@ -44,17 +44,31 @@ logits, _ = run(adapter, ids, patches=..., fp32_logits=True)
 
 the predictions were written down and committed before the run, in `experiments/bf16_audit_prediction.txt`. two held and four didn't. fp32 wasn't perfectly batch-stable on pythia-160m, which drifts by up to 0.007 because its logits are so big. gpt-2 jumped by 0.5 on 10 prompts, short of the quarter i guessed. pythia's typical bf16 jump was smaller than gpt-2's, because a grid of 4 swallows most of the drift and then jumps by 4 or 8 on 5 prompts. and the fp32 head alone didn't fix pythia, because the problem was never the head.
 
+## where the offsets come from
+
+the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q · b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100. i don't know what pushes it. my guess is adam turning tiny numerical gradients into full-size steps, but that's untested.
+
+![the key bias](docs/figures/x_key_bias.png)
+
+it reaches past patching. on wikitext-2, pythia-70m's perplexity goes from 68 to 659 in bf16. 160m gets 171% worse, 410m 20%, 1.4b almost 6%. in fp16, 70m, 160m, 410m and 1.4b give nan on every window.
+
+zeroing that part of the bias is an exact edit, `drop_invariant_key_bias(adapter)`. in fp32 the logits move by at most 0.007. after it, pythia-410m runs in plain bf16 within 0.1% of fp32 and its patching sweep matches fp32, and fp16 is finite again on 70m, 160m and 410m. it doesn't cover everything. 70m and 160m also need the fp32 head, because their output logits are huge. 1.4b still overflows fp16, because hf multiplies q by k before scaling and that product hits 129,160 even without the bias. keeping attention and the head in fp32 handles every case here, within 0.6% of fp32 perplexity on all six models.
+
+the predictions for this part are in `experiments/key_bias_prediction.txt`, each batch committed before it ran. six held and three didn't. plain bf16 with the bias dropped wasn't enough for pythia-160m's patching sweep (median error 0.051, i'd said 0.02). the 25 prompts where bf16 saw no effect came back with the bias alone, when i'd guessed the output grid would keep more than 10 of them lost. and dropping the bias left 160m's bf16 perplexity 60% off instead of within 0.5%, which is how the second problem, its huge output logits, showed up.
+
 ## run it
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128   # pick the build for your gpu
 pip install -e ".[dev]"
-pytest -q                                          # 68 tests, cpu only, no downloads
+pytest -q                                          # 71 tests, cpu only, no downloads
 kerneltrace run experiments/gpt2_ioi_mlp0.yaml     # about 6 minutes on an 8 gb laptop gpu
 kerneltrace replay evidence/<bundle>               # rerun a bundle and compare it to what was stored
 python scripts/causal_trace.py 24                  # the traces behind the picture above
 python scripts/bf16_batch_check.py                 # one prompt, two batch sizes, the 0.5 jump
 python scripts/bf16_audit.py && python scripts/bf16_summary.py   # the bf16 audit, about 15 minutes
+python scripts/key_bias.py                         # parity of the bias edit, training checkpoints, the whole suite
+python scripts/lm_quality.py                       # wikitext-2 perplexity in fp32, bf16 and fp16
 ```
 
 a run writes a folder under `runs/`. inside is the manifest (model commit, library and driver versions, gpu, tf32 and determinism switches, git state), the claim with its final status, every generated prompt with the reason any were rejected, raw per-case results, the kernels the profiler saw, and a report.
@@ -65,6 +79,6 @@ a run writes a folder under `runs/`. inside is the manifest (model commit, libra
 
 the status rules live in `kerneltrace/core/verdict.py`. short version: a failed gate means inconclusive. an interval on the wrong side of its threshold means falsified. an untested invariance means inconclusive. a valid attack that changes a decision means challenged.
 
-some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
+some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b, perplexity up to 1.4b, and the bias survey reads weights up to 12b without running them. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
 
 mit license.

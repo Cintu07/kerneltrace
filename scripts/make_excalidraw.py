@@ -414,6 +414,82 @@ def bf16_audit():
     save("x_bf16_audit", E)
 
 
+def key_bias():
+    kb = json.loads((EV / "bf16_audit" / "key_bias.json").read_text(encoding="utf-8"))
+    lm = json.loads((EV / "bf16_audit" / "lm_quality.json").read_text(encoding="utf-8"))["models"]
+    E = [text(40, 26, "where it comes from: a key bias softmax can't see", 34, INK),
+         text(42, 78, "the part of each key bias that rotary leaves alone adds the same number to every score of a "
+                      "query. softmax removes it, so in exact math the loss never pushes back on it.", 18, GREY)]
+    # left: pythia-160m over training, checkpoints evenly spaced
+    steps = kb["training"]["steps"]
+    keys = sorted(steps, key=int)
+    gx, gy, gw, gh, top = 70, 520, 470, 330, 300.0
+    X = lambda i: gx + i * gw / (len(keys) - 1)
+    Y = lambda v: gy - v / top * gh
+    E.append(text(40, 140, "pythia-160m, over training", 22, INK))
+    for g in (100, 200, 300):
+        E.append(line([(gx, Y(g)), (gx + gw, Y(g))], RULE, 1, dashed=True))
+        E.append(text(gx - 46, Y(g) - 10, str(g), 15, GREY, font=CODE))
+    E.append(line([(gx, gy), (gx + gw, gy)], INK, 2))
+    for kind, color, width, dashed in (("invariant", BLUE, 3, False), ("rotary", GREY, 2, False),
+                                       ("query", GREY, 2, True)):
+        pts = [(X(i), Y(max(l[kind] for l in steps[k]["layers"]))) for i, k in enumerate(keys)]
+        E.append(line(pts, color, width, dashed=dashed))
+    end = lambda kind: max(l[kind] for l in steps[keys[-1]]["layers"])
+    E.append(text(gx + gw - 250, Y(end("invariant")) - 34, f"key bias, the part softmax\ncan't see: {end('invariant'):.0f}",
+                  16, BLUE))
+    E.append(text(gx + gw + 10, Y(end("rotary")) - 22, f"rotary part {end('rotary'):.0f}", 15, GREY))
+    E.append(text(gx + gw + 10, Y(end("query")) - 2, f"query bias {end('query'):.0f}", 15, GREY))
+    for i, k in enumerate(keys):
+        if int(k) in (0, 1000, 8000, 64000, 143000):
+            lab = "0" if k == "0" else (f"{int(k) // 1000}k")
+            E.append(text(X(i) - 30, gy + 12, lab, 15, GREY, align="center", w=60, font=CODE))
+    E.append(text(gx, gy + 40, "training step (checkpoints, evenly spaced)", 15, GREY))
+    # middle: the whole suite
+    suite = kb["suite"]
+    sx, sw = 720, 50
+    E.append(text(sx - 20, 140, "every pythia size, final weights", 22, INK))
+    smax = 420.0
+    for i, (size, r) in enumerate(suite.items()):
+        v = r["invariant_max"]
+        x = sx + i * (sw + 16)
+        h = v / smax * gh
+        E.append(rect(x, gy - h, sw, h, backgroundColor=BLUE if v > 100 else RULE, strokeColor=BLUE if v > 100 else GREY,
+                      fillStyle="solid" if v > 100 else "hachure", roundness=None, strokeWidth=1))
+        E.append(text(x - 8, gy - h - 26, f"{v:.0f}", 15, INK, align="center", w=sw + 16, font=CODE))
+        E.append(text(x - 8, gy + 12, size, 15, GREY, align="center", w=sw + 16))
+    E.append(line([(sx - 10, gy), (sx + len(suite) * (sw + 16), gy)], INK, 2))
+    # right: what it does to ordinary use
+    tx = 1300
+    E.append(text(tx, 140, "perplexity on wikitext-2, change from fp32", 22, INK))
+    cols = [tx, tx + 120, tx + 220, tx + 320, tx + 440, tx + 550]
+    heads = ["", "bf16", "fp16", "bf16, bias\ndropped,\nfp32 head", "fp16, bias\ndropped", "bf16, fp32\nattention\nand head"]
+    for c, h in zip(cols, heads):
+        E.append(text(c, 180, h, 15, GREY))
+    fmt = lambda r: "nan" if r["vs_fp32"] is None else f"{r['vs_fp32']:+.1%}"
+    order = [n for n in ("gpt2", "pythia-70m", "pythia-160m", "pythia-410m", "pythia-1b", "pythia-1.4b") if n in lm]
+    for i, n in enumerate(order):
+        r = lm[n]
+        y = 262 + i * 46
+        cells = [fmt(r["bf16"]), fmt(r["fp16"]), fmt(r["bf16, key bias dropped + fp32 head"]),
+                 fmt(r["fp16, key bias dropped"]), fmt(r["bf16 + fp32 attention and head"])]
+        E.append(text(cols[0], y, n.replace("pythia-", "pythia ").replace("gpt2", "gpt-2"), 18, INK))
+        for c, v in zip(cols[1:], cells):
+            bad = v == "nan" or abs(float(v.strip("%+"))) >= 3
+            E.append(text(c, y, v, 16, BLUE if bad else INK, font=CODE))
+        E.append(line([(tx, y + 34), (tx + 640, y + 34)], RULE, 1))
+    E.append(text(tx, 262 + len(order) * 46 + 10,
+                  "blue: 3% or worse, or nan. pythia 1.4b still overflows fp16 with the\n"
+                  "bias dropped: hf multiplies q by k before scaling, and that hits\n"
+                  "129,160. keeping attention in fp32 fixes that one too.", 15, GREY))
+    E.append(text(40, gy + 90, "drop_invariant_key_bias(adapter) zeroes that part. in fp32 the logits move by at most "
+                               f"{max(v['max_abs_logit_change'] for v in kb['parity'].values()):.3f}, about as much as "
+                               "fp32 drifts between batch sizes.", 20, INK))
+    E.append(text(40, gy + 126, "github.com/Cintu07/kerneltrace   scripts/key_bias.py   scripts/lm_quality.py", 17, GREY,
+                  font=CODE))
+    save("x_key_bias", E)
+
+
 # --- the readme diagram: tall enough to read at github's column width
 def method():
     W = 1100
@@ -470,6 +546,6 @@ def method():
 if __name__ == "__main__":
     import sys
 
-    figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit)}
+    figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit, key_bias)}
     for name in sys.argv[1:] or figures:
         figures[name]()

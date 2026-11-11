@@ -1,0 +1,311 @@
+{
+ "wikitext": {
+  "repo": "Salesforce/wikitext",
+  "file": "wikitext-2-raw-v1/test-00000-of-00001.parquet",
+  "revision": "b08601e04326c79dfdd32d625aee71d232d685c3"
+ },
+ "window": 512,
+ "n_windows": 64,
+ "models": {
+  "gpt2": {
+   "fp32": {
+    "perplexity": 37.77827035927167,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 38.141419202621265,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.009612638161992093
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 38.10804985488343,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.008729343415554869
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 37.71750937038271,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -0.0016083581463928187
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 37.711398166151724,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -0.001770123207970986
+   },
+   "fp16": {
+    "perplexity": 37.78512408804209,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0001814198666385547
+   },
+   "fp16, key bias dropped": {
+    "perplexity": 37.78690174781747,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.00022847495302746879
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 37.7850472234909,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0001793852432834253
+   }
+  },
+  "pythia-160m": {
+   "fp32": {
+    "perplexity": 39.987716894472385,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 108.44847021967529,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 1.7120445637311796
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 64.19547198448964,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.6053797758422053
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 40.11794539637303,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.003256712611133139
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 40.10709136251038,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.002985278413194292
+   },
+   "fp16": {
+    "perplexity": NaN,
+    "nonfinite_windows": 64,
+    "nonfinite_prompts": 48,
+    "vs_fp32": null
+   },
+   "fp16, key bias dropped": {
+    "perplexity": 40.30395024340579,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.00790826217380558
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 40.29602160061361,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.007709985217581705
+   }
+  },
+  "pythia-410m": {
+   "fp32": {
+    "perplexity": 23.67874638014212,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 28.32296277612261,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.19613438656850946
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 23.700038089859977,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0008991907500521812
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 23.691704814281618,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0005472601433986757
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 23.678407346045397,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -1.431807627305659e-05
+   },
+   "fp16": {
+    "perplexity": NaN,
+    "nonfinite_windows": 64,
+    "nonfinite_prompts": 48,
+    "vs_fp32": null
+   },
+   "fp16, key bias dropped": {
+    "perplexity": 23.67989706412347,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 4.859564619152934e-05
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 23.679288438223725,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 2.2892178196620705e-05
+   }
+  },
+  "pythia-1b": {
+   "fp32": {
+    "perplexity": 19.39211972400482,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 19.396033486749165,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.00020182232783438891
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 19.397799987842344,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0002929160874811654
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 19.39623475216581,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.00021220104968189268
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 19.390143778394567,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -0.00010189425593365442
+   },
+   "fp16": {
+    "perplexity": 19.391785898106377,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -1.7214513070018533e-05
+   },
+   "fp16, key bias dropped": {
+    "perplexity": 19.392177051146646,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 2.9562081216294445e-06
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 19.391532420093935,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": -3.028569951324389e-05
+   }
+  },
+  "pythia-70m": {
+   "fp32": {
+    "perplexity": 67.97916781480822,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 659.1886636219691,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 8.696921642491407
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 337.019246450553,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 3.957684203617722
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 68.48083431276689,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0073797093151437565
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 68.36263338165094,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.005640927642529769
+   },
+   "fp16": {
+    "perplexity": NaN,
+    "nonfinite_windows": 64,
+    "nonfinite_prompts": 0,
+    "vs_fp32": null
+   },
+   "fp16, key bias dropped": {
+    "perplexity": 70.08244321815639,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.03093999928151514
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 70.13667105058548,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.031737711789217915
+   }
+  },
+  "pythia-1.4b": {
+   "fp32": {
+    "perplexity": 17.060974661976182,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 18.03201748147764,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.056916022603657135
+   },
+   "bf16, key bias dropped": {
+    "perplexity": 17.415118909181587,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.02075756246181437
+   },
+   "bf16, key bias dropped + fp32 head": {
+    "perplexity": 17.41206512535556,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.020578570118966022
+   },
+   "bf16 + fp32 attention and head": {
+    "perplexity": 17.126414288107316,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.003835632337991779
+   },
+   "fp16": {
+    "perplexity": NaN,
+    "nonfinite_windows": 64,
+    "nonfinite_prompts": 0,
+    "vs_fp32": null
+   },
+   "fp16, key bias dropped": {
+    "perplexity": NaN,
+    "nonfinite_windows": 64,
+    "nonfinite_prompts": 0,
+    "vs_fp32": null
+   },
+   "fp16 + fp32 attention": {
+    "perplexity": 17.064143936860518,
+    "nonfinite_windows": 0,
+    "nonfinite_prompts": 0,
+    "vs_fp32": 0.00018576165471939632
+   }
+  }
+ }
+}
