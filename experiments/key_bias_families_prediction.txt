@@ -24,3 +24,14 @@ scripts/key_bias_other_models.py:
 8. santacoder: dropping the invariant key bias moves fp32 logits by at most 0.01, and brings bf16 within
    1% of fp32.
 9. opt-125m: bf16 within 2% of fp32 with the bias in place. its invariant part is small.
+
+added after 7-9 were run (santacoder: bf16 +0.1%, fp16 nan on all 32 windows, fp16 with the bias
+dropped -0.0%) and after the survey showed qwen2.5's key bias sitting in the slow rotary dims, before
+these runs. for qwen the edit zeroes the key bias in the dims that turn under 0.1 rad over 4096
+positions. that is not exact, those dims still turn a little.
+
+10. bloom-560m (invariant 183): fp16 or bf16 perplexity at least 2% worse than fp32, and dropping
+    the bias brings both within 1%.
+11. qwen2.5-0.5b: zeroing the slow-dim key bias moves fp32 logits by under 0.5 and fp32 perplexity
+    by under 1%.
+12. qwen2.5-0.5b: fp16 gives a non-finite window with the bias in place, and none with it zeroed.
