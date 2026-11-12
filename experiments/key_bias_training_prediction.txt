@@ -1,0 +1,37 @@
+why does the invariant key bias grow? predictions, written before any of these runs.
+
+setup (scripts/key_bias_training.py): a small pythia-shaped model trained from scratch.
+gpt-neox architecture, rotary on 25% of each head, parallel residual, 4 layers, width 256,
+4 heads of 64, so each head's key bias has 16 rotary dims and 48 invariant dims. pythia tokenizer,
+wikitext-2 train, 16 x 256 tokens a step, 3000 steps, lr 1e-3 with warmup and cosine decay,
+adam (0.9, 0.95), eps 1e-8, weight decay 0.01 on matrices only (biases and norms get none, like
+gpt-neox), grad clip 1.0, eager attention, same seed and data order in every run.
+
+runs
+  fp32 adam            everything in fp32
+  fp16 adam            autocast fp16 with a grad scaler, the way pythia was trained
+  bf16 adam            autocast bf16
+  fp16 adam eps 1e-4   as fp16 adam with a large adam epsilon
+  fp16 sgd             autocast fp16, sgd with momentum 0.9, lr 0.1
+
+the idea being tested: in exact math the gradient of the invariant part is zero, because it is
+(sum over keys of the score gradient) times q, and that sum is zero. in low precision the score
+gradient is cast down before the matmul, the row sums stop being zero, and the invariant part gets
+a small gradient with a consistent sign. adam divides by the gradient's own size, so a small
+consistent gradient still gets full-size steps. sgd does not, and a large eps does not.
+
+"invariant norm" below is the largest per-layer norm of the invariant key bias at step 3000.
+"rotary norm" is the same for the 16 rotary dims of the same tensor.
+
+1. fp32 adam: invariant norm below 1.0.
+2. fp16 adam: invariant norm more than 2x the rotary norm in at least one layer
+   (pythia-160m was 4.4 against 1.4 by step 2000).
+3. fp16 adam: invariant norm at least 5x the fp32 adam run's.
+4. bf16 adam: invariant norm at least as large as fp16 adam's, since bf16 keeps 8 significant bits
+   to fp16's 11 and the cast error in the row sums should be bigger.
+5. fp16 adam eps 1e-4: invariant norm at most half of fp16 adam's.
+6. fp16 sgd: invariant norm below 1.0.
+7. gradient size, median over logged steps of |grad invariant| / |grad rotary|:
+   below 1e-3 in fp32 adam, above 1e-2 in fp16 adam.
+8. final validation loss of fp16 adam within 2% of fp32 adam. the growth does not hurt training
+   at this scale.
