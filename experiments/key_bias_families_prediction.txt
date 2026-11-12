@@ -1,0 +1,18 @@
+does the softmax-invariant key bias show up outside pythia? predictions, written before
+scripts/key_bias_families.py was run.
+
+the number is the largest per-head norm of the invariant part of the key bias, over all layers,
+the same measure that gives pythia-160m 279. for scale, pythia's query bias stays under 9 and the
+part of its key bias that rotary touches stays under 20.
+
+what i know going in: opt and pythia were trained with fp16 mixed precision, bloom and cerebras-gpt
+with bf16, and the training experiment says both grow it. i don't know gpt-2's training precision.
+
+1. at least one non-pythia family has a model with an invariant part over 100.
+2. opt: every size has an invariant part at least 5x its query bias.
+3. bloom: every size has an invariant part at least 5x its query bias.
+4. gpt-neox-20b: invariant part over 100, since it was trained with the same code and precision as pythia.
+5. qwen2.5 has no invariant part by construction. its key bias, which the loss can see, is no
+   bigger than 5x its query bias.
+6. somewhere in the survey there is a model with a key bias whose invariant part is under 2x its query
+   bias, so the growth is not universal.
