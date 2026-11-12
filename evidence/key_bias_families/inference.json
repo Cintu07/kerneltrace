@@ -1,0 +1,150 @@
+{
+ "santacoder": {
+  "repo": "bigcode/gpt_bigcode-santacoder",
+  "revision": "291931872cae83498cf984b16319f47f5e9e7a07",
+  "text": "code",
+  "windows": 32,
+  "window": 512,
+  "invariant_removed_max": 384.1135559082031,
+  "fp32_max_logit_change": 0.0014535188674926758,
+  "fp32_perplexity": 4.69909857555997,
+  "settings": {
+   "fp32": {
+    "perplexity": 4.69909857555997,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 4.704403294333763,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.001128880079550365
+   },
+   "bf16, bias dropped": {
+    "perplexity": 4.699436359698998,
+    "nonfinite_windows": 0,
+    "vs_fp32": 7.188275231873043e-05
+   },
+   "fp16": {
+    "perplexity": NaN,
+    "nonfinite_windows": 32,
+    "vs_fp32": null
+   },
+   "fp16, bias dropped": {
+    "perplexity": 4.6990574800733524,
+    "nonfinite_windows": 0,
+    "vs_fp32": -8.745397858000992e-06
+   }
+  }
+ },
+ "opt-125m": {
+  "repo": "facebook/opt-125m",
+  "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+  "text": "wikitext",
+  "windows": 32,
+  "window": 512,
+  "invariant_removed_max": 7.640283584594727,
+  "fp32_max_logit_change": 2.47955322265625e-05,
+  "fp32_perplexity": 41.76738725484713,
+  "settings": {
+   "fp32": {
+    "perplexity": 41.76738725484713,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 41.76036454422672,
+    "nonfinite_windows": 0,
+    "vs_fp32": -0.00016813861440656552
+   },
+   "bf16, bias dropped": {
+    "perplexity": 41.752067887872705,
+    "nonfinite_windows": 0,
+    "vs_fp32": -0.000366778196609463
+   },
+   "fp16": {
+    "perplexity": 41.76845986154811,
+    "nonfinite_windows": 0,
+    "vs_fp32": 2.5680483541679067e-05
+   },
+   "fp16, bias dropped": {
+    "perplexity": 41.768669397235925,
+    "nonfinite_windows": 0,
+    "vs_fp32": 3.0697213138308754e-05
+   }
+  }
+ },
+ "bloom-560m": {
+  "repo": "bigscience/bloom-560m",
+  "revision": "ac2ae5fab2ce3f9f40dc79b5ca9f637430d24971",
+  "text": "wikitext",
+  "windows": 32,
+  "window": 512,
+  "invariant_removed_max": 183.42962646484375,
+  "fp32_max_logit_change": 0.0012359619140625,
+  "fp32_perplexity": 30.708332374673667,
+  "settings": {
+   "fp32": {
+    "perplexity": 30.708332374673667,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 34.819688888987386,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.1338840697746424
+   },
+   "bf16, bias dropped": {
+    "perplexity": 34.82669743059787,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.1341122990879431
+   },
+   "fp16": {
+    "perplexity": 30.761237581742233,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0017228290492321552
+   },
+   "fp16, bias dropped": {
+    "perplexity": 30.743836205762165,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.001156162785243886
+   }
+  }
+ },
+ "qwen2.5-0.5b": {
+  "repo": "Qwen/Qwen2.5-0.5B",
+  "revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
+  "text": "wikitext",
+  "windows": 32,
+  "window": 512,
+  "invariant_removed_max": 283.2976379394531,
+  "fp32_max_logit_change": 0.17678499221801758,
+  "fp32_perplexity": 15.779896227414403,
+  "settings": {
+   "fp32": {
+    "perplexity": 15.779896227414403,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16": {
+    "perplexity": 15.79545489461651,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0009859803244509635
+   },
+   "bf16, bias dropped": {
+    "perplexity": 15.779818362159663,
+    "nonfinite_windows": 0,
+    "vs_fp32": -4.934459239658295e-06
+   },
+   "fp16": {
+    "perplexity": 15.778351657517787,
+    "nonfinite_windows": 0,
+    "vs_fp32": -9.788213270578439e-05
+   },
+   "fp16, bias dropped": {
+    "perplexity": 15.777913669159608,
+    "nonfinite_windows": 0,
+    "vs_fp32": -0.00012563823147015984
+   }
+  }
+ }
+}

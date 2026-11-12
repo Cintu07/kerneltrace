@@ -555,6 +555,98 @@ def key_bias_training():
     save("x_key_bias_training", E)
 
 
+def key_bias_families():
+    fam = json.loads((EV / "key_bias_families" / "families.json").read_text(encoding="utf-8"))
+    inf = json.loads((EV / "key_bias_families" / "inference.json").read_text(encoding="utf-8"))
+    kb = json.loads((EV / "bf16_audit" / "key_bias.json").read_text(encoding="utf-8"))
+    lm = json.loads((EV / "bf16_audit" / "lm_quality.json").read_text(encoding="utf-8"))["models"]
+    E = [text(40, 26, "outside pythia: it grows in some models, and breaks a few", 34, INK),
+         text(42, 78, "largest per-head norm of the part of each key bias softmax can't see, read from the final weights. "
+                      "log scale. for scale, query biases sit between 1 and 11, qwen's up to 160.", 18, GREY)]
+    rows = [("pythia", [(f"pythia {s}", v["invariant_max"], False) for s, v in kb["suite"].items()])]
+    groups = [("santacoder", ["bigcode/gpt_bigcode-santacoder"]), ("bloom", [k for k in fam if "bloom" in k]),
+              ("phi", [k for k in fam if "phi" in k]), ("stablelm", [k for k in fam if "stablelm" in k]),
+              ("gpt-neox", ["EleutherAI/gpt-neox-20b"]), ("gpt-2", [k for k in fam if "gpt2" in k]),
+              ("opt", [k for k in fam if "opt-" in k]), ("qwen2.5", [k for k in fam if "Qwen" in k])]
+    for g, keys in groups:
+        items = []
+        for k in keys:
+            r = fam.get(k, {})
+            if "error" in r or not r:
+                continue
+            short = k.split("/")[1].replace("gpt_bigcode-", "").replace("-base-alpha", "").lower()
+            if r.get("full_rotary_split"):
+                items.append((short, r["full_rotary_split"]["near_invariant_max"], True))
+            else:
+                items.append((short, r["invariant_max"], False))
+        rows.append((g, items))
+    gx, y0, gw, rh = 260, 150, 560, 21
+    L = lambda v: gx + (math.log10(max(v, 0.5)) - math.log10(0.5)) / (math.log10(1000) - math.log10(0.5)) * gw
+    n = sum(len(i) for _, i in rows) + len(rows)
+    for g in (1, 10, 100, 1000):
+        E.append(line([(L(g), y0 - 8), (L(g), y0 + n * rh)], RULE, 1, dashed=True))
+        E.append(text(L(g) - 30, y0 + n * rh + 6, str(g), 15, GREY, align="center", w=60, font=CODE))
+    y = y0
+    for g, items in rows:
+        E.append(text(40, y, g, 17, INK))
+        y += rh
+        for name, v, approx in items:
+            hot = v > 100
+            E.append(rect(gx, y + 3, max(2, L(v) - gx), rh - 6, roundness=None, strokeWidth=1,
+                          backgroundColor=BLUE if hot else RULE, strokeColor=BLUE if hot else GREY,
+                          fillStyle="hachure" if approx else "solid"))
+            E.append(text(70, y + 1, name, 14, GREY))
+            E.append(text(L(v) + 8, y + 1, f"{v:.0f}" if v >= 10 else f"{v:.1f}", 14, INK, font=CODE))
+            y += rh
+    bottom = y + 40
+    # right: inference
+    tx = 1020
+    E.append(text(tx, 140, "perplexity, change from fp32, and what dropping it does", 22, INK))
+    cols = [tx, tx + 190, tx + 300, tx + 420, tx + 540, tx + 660, tx + 780]
+    for c, h in zip(cols, ["model", "removed", "fp32 logits\nmove by", "bf16", "bf16,\ndropped", "fp16", "fp16,\ndropped"]):
+        E.append(text(c, 182, h, 15, GREY))
+
+    def pct(v):
+        return "nan" if v is None else f"{v:+.1%}"
+
+    table = []
+    for m in ("pythia-70m", "pythia-160m", "pythia-410m"):
+        r = lm[m]
+        par = kb["parity"].get(m, {}).get("max_abs_logit_change")
+        table.append((m.replace("pythia-", "pythia "), kb["suite"][m.split("-")[1]]["invariant_max"],
+                      "—" if par is None else f"{par:.4f}", pct(r["bf16"]["vs_fp32"]),
+                      pct(r["bf16, key bias dropped"]["vs_fp32"]), pct(r["fp16"]["vs_fp32"]),
+                      pct(r["fp16, key bias dropped"]["vs_fp32"])))
+    for m in ("santacoder", "bloom-560m", "qwen2.5-0.5b", "opt-125m"):
+        r = inf[m]
+        s = r["settings"]
+        table.append((m + ("*" if m.startswith("qwen") else ""), r["invariant_removed_max"], f"{r['fp32_max_logit_change']:.4f}",
+                      pct(s["bf16"]["vs_fp32"]), pct(s["bf16, bias dropped"]["vs_fp32"]),
+                      pct(s["fp16"]["vs_fp32"]), pct(s["fp16, bias dropped"]["vs_fp32"])))
+    for i, row in enumerate(table):
+        y = 250 + i * 44
+        E.append(text(cols[0], y, row[0], 17, INK))
+        E.append(text(cols[1], y, f"{row[1]:.0f}", 16, INK, font=CODE))
+        E.append(text(cols[2], y, row[2], 16, INK, font=CODE))
+        for c, v in zip(cols[3:], row[3:]):
+            bad = v == "nan" or abs(float(v.strip("%+"))) >= 3
+            E.append(text(c, y, v, 16, BLUE if bad else INK, font=CODE))
+        E.append(line([(tx, y + 32), (tx + 880, y + 32)], RULE, 1))
+    y = 250 + len(table) * 44 + 12
+    E.append(text(tx, y, "blue: 3% or worse, or nan on every window. pythia rows use the wikitext-2 windows from\n"
+                         "lm_quality.py (64 of 512), the rest 32 of 512. santacoder is scored on python code.\n"
+                         "* qwen: approximate edit on the slow dims, so the fp32 logits move.", 15, GREY))
+    E.append(text(tx, y + 92, "santacoder overflows fp16 on every window and dropping the bias fixes it exactly. bloom-560m\n"
+                              "loses 13% in bf16 and dropping its bias of 183 changes nothing, so that loss comes from\n"
+                              "somewhere else. a big invisible bias is not enough to predict damage.", 17, INK))
+    E.append(text(tx, y + 190, "qwen2.5 has rotary on every dim, so nothing in it is exactly invariant. the hatched bars\n"
+                               "on the left are its key bias in the dims that turn less than 0.1 rad over 4096 positions.\n"
+                               "zeroing that part moves the fp32 logits by 0.18 and perplexity by under 0.01%.", 15, GREY))
+    E.append(text(40, bottom, "github.com/Cintu07/kerneltrace   scripts/key_bias_families.py   scripts/key_bias_other_models.py",
+                  17, GREY, font=CODE))
+    save("x_key_bias_families", E)
+
+
 # --- the readme diagram: tall enough to read at github's column width
 def method():
     W = 1100
@@ -612,6 +704,6 @@ if __name__ == "__main__":
     import sys
 
     figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit, key_bias,
-                                             key_bias_training)}
+                                             key_bias_training, key_bias_families)}
     for name in sys.argv[1:] or figures:
         figures[name]()

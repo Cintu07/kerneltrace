@@ -46,7 +46,7 @@ the predictions were written down and committed before the run, in `experiments/
 
 ## where the offsets come from
 
-the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q · b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100.
+the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q Â· b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100.
 
 ![the key bias](docs/figures/x_key_bias.png)
 
@@ -63,6 +63,20 @@ the gradient explains it. the invariant part's gradient is the row sum of the so
 two controls pin it down. fp16 everywhere except attention, which runs in fp32, ends at 0.004, the same as full fp32. so the leak is in the attention backward. adam with eps 1e-4 in fp16 ends at 0.000, but it also slows every other small weight, and the rotary part only reaches 2.18 instead of 4.04. the run doesn't show where the sign of the leak comes from, or how far it would have gone over pythia's 143,000 steps.
 
 nine predictions, in `experiments/key_bias_training_prediction.txt`, the ninth added before its run. seven held. the invariant part never got bigger than the rotary part in 3,000 steps (0.34 against 4.04), and i'd guessed it would be twice as big. the fp16 gradient ratio was 4e-4, not above 1e-2. the sgd run moved no bias at all, rotary part included, so it says nothing about adam and the eps run carries that instead.
+
+## outside pythia
+
+any model with a key bias has the invariant part. with learned positions or alibi it's the whole key bias, with partial rotary it's the dims rotary skips. `scripts/key_bias_families.py` reads it out of 23 checkpoints from eight families the same way as the pythia suite, bias tensors only.
+
+![outside pythia](docs/figures/x_key_bias_families.png)
+
+it grows in some of them. santacoder's is 384 and bloom-560m's 183, against query biases of 7 and 11. the rest of bloom, phi, stablelm-7b and gpt-neox-20b sit between 14 and 80. gpt-2 and opt stay under 10, and gpt-2 medium, large and xl are below their own query bias, so it isn't something every model does.
+
+qwen2.5 has rotary on every dim, so none of its key bias is exactly invariant. but its rotary base is a million, and its slowest dims turn less than a tenth of a radian over 4,096 positions. that's where its key bias sits, 283 in 0.5b, 821 in 1.5b and 920 in 7b, against 35 to 120 in all the other dims. zeroing it there moves the fp32 logits by 0.18 and the perplexity by under 0.01%.
+
+big doesn't mean broken. `scripts/key_bias_other_models.py` runs perplexity with and without it. santacoder gives nan on every window in fp16, and with the invariant part dropped fp16 matches fp32. that edit moves the fp32 logits by 0.0015. but its bf16 is only 0.1% off. bloom-560m loses 13.4% in bf16 and dropping its 183 changes nothing, so its problem is somewhere else. qwen and opt are fine in both.
+
+twelve predictions in `experiments/key_bias_families_prediction.txt`, five held. i expected the growth to be more common and to do more damage than it does. opt, bloom-7b1, gpt-neox-20b and qwen-1.5b all came in under what i guessed, santacoder broke in fp16 and not bf16, bloom's bf16 loss wasn't the bias, and qwen didn't overflow fp16. cerebras-gpt is gated now and wasn't checked.
 
 it reaches past patching. on wikitext-2, pythia-70m's perplexity goes from 68 to 659 in bf16. 160m gets 171% worse, 410m 20%, 1.4b almost 6%. in fp16, 70m, 160m, 410m and 1.4b give nan on every window.
 
@@ -84,6 +98,8 @@ python scripts/bf16_audit.py && python scripts/bf16_summary.py   # the bf16 audi
 python scripts/key_bias.py                         # parity of the bias edit, training checkpoints, the whole suite
 python scripts/lm_quality.py                       # wikitext-2 perplexity in fp32, bf16 and fp16
 python scripts/key_bias_training.py && python scripts/key_bias_training_summary.py   # train it six ways, about 30 minutes
+python scripts/key_bias_families.py                # the invariant key bias in 23 checkpoints outside pythia
+python scripts/key_bias_other_models.py            # perplexity with and without it, santacoder, bloom, qwen, opt
 ```
 
 a run writes a folder under `runs/`. inside is the manifest (model commit, library and driver versions, gpu, tf32 and determinism switches, git state), the claim with its final status, every generated prompt with the reason any were rejected, raw per-case results, the kernels the profiler saw, and a report.
@@ -94,6 +110,6 @@ a run writes a folder under `runs/`. inside is the manifest (model commit, libra
 
 the status rules live in `kerneltrace/core/verdict.py`. short version: a failed gate means inconclusive. an interval on the wrong side of its threshold means falsified. an untested invariance means inconclusive. a valid attack that changes a decision means challenged.
 
-some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b, perplexity up to 1.4b, and the bias survey reads weights up to 12b without running them. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
+some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b, perplexity up to 1.4b, and the bias survey reads pythia up to 12b and 23 other checkpoints up to 20b without running them. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
 
 mit license.
