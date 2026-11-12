@@ -648,6 +648,58 @@ def key_bias_families():
 
 
 # --- the readme diagram: tall enough to read at github's column width
+def patching_floor():
+    fl = json.loads((EV / "patching_floor" / "summary.json").read_text(encoding="utf-8"))
+    order = [n for n in ("pythia-410m-deduped", "pythia-410m", "gpt2-medium") if n in fl]
+    E = [text(40, 26, "the fp32 floor under interaction patching is the key bias", 34, INK),
+         text(42, 78, "pair interactions q = f11 - f10 - f01 + f00 from residual stream patching on ioi, 20 prompts, "
+                      "28 pairs each. floor = median |q in fp32 - q in fp64|, the measure baligar (2026) used.", 18, GREY)]
+    gx, gy, gw = 300, 200, 560
+    lo, hi = -6, -3
+    X = lambda v: gx + (math.log10(v) - lo) / (hi - lo) * gw
+    E.append(text(40, 150, "fp32 floor, log scale", 22, INK))
+    for e in range(lo, hi + 1):
+        E.append(line([(X(10 ** e), gy), (X(10 ** e), gy + len(order) * 120)], RULE, 1, dashed=True))
+        E.append(text(X(10 ** e) - 40, gy + len(order) * 120 + 8, f"1e{e}", 15, GREY, align="center", w=80, font=CODE))
+    for i, n in enumerate(order):
+        y = gy + 20 + i * 120
+        E.append(text(40, y + 18, n, 19, INK))
+        for j, (k, fill, lab) in enumerate((("float32", RAMP[7], "as released"), ("float32, bias dropped", RAMP[2], "bias dropped"))):
+            v = fl[n][k]["floor"]
+            yy = y + j * 42
+            E.append(rect(gx, yy, max(4, X(v) - gx), 32, backgroundColor=fill, strokeColor=INK, strokeWidth=1))
+            E.append(text(X(v) + 10, yy + 6, f"{v:.1e}  {lab}", 15, INK, font=CODE))
+        r = fl[n]["float32"]["floor"] / fl[n]["float32, bias dropped"]["floor"]
+        E.append(text(gx + gw + 190, y + 22, f"{r:.0f}x lower" if r >= 2 else f"{r:.1f}x", 20, BLUE if r >= 2 else GREY))
+    # right: bf16
+    tx, ty = 1210, 150
+    E.append(text(tx, ty, "the same pairs in bf16", 22, INK))
+    cols = [tx, tx + 250, tx + 400]
+    for c, h in zip(cols, ["", "error bigger
+than the effect", "sign
+flipped"]):
+        E.append(text(c, ty + 42, h, 15, GREY))
+    y = ty + 104
+    for n in order:
+        for k, lab in (("bfloat16", "as released"), ("bfloat16, bias dropped", "bias dropped")):
+            f = fl[n][k]
+            E.append(text(cols[0], y, f"{n}
+  {lab}", 15, INK))
+            E.append(text(cols[1], y + 8, f"{f['share_err_over_signal']:.0%}", 17, INK, font=CODE))
+            E.append(text(cols[2], y + 8, f"{f['sign_disagree']:.0%}", 17, INK, font=CODE))
+            y += 50
+        E.append(line([(tx, y - 4), (tx + 520, y - 4)], RULE, 1))
+        y += 8
+    E.append(text(tx, y + 8, "dropping the bias helps bf16 too, but the
+pairs are still mostly noise there.", 15, GREY))
+    by = gy + len(order) * 120 + 70
+    E.append(text(40, by, "fp64 interactions with and without the bias agree to 1e-11, so the edit changes nothing in exact math. "
+                          "what it removes is fp32 rounding.", 20, INK))
+    E.append(text(40, by + 36, "github.com/Cintu07/kerneltrace   scripts/patching_floor.py   experiments/followups_prediction.txt",
+                  17, GREY, font=CODE))
+    save("x_patching_floor", E)
+
+
 def method():
     W = 1100
     E = [text(0, 20, "kerneltrace", 46, INK, align="center", w=W),
@@ -704,6 +756,6 @@ if __name__ == "__main__":
     import sys
 
     figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit, key_bias,
-                                             key_bias_training, key_bias_families)}
+                                             key_bias_training, key_bias_families, patching_floor)}
     for name in sys.argv[1:] or figures:
         figures[name]()

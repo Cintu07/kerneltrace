@@ -1,0 +1,31 @@
+{
+ "repo": "bigscience/bloom-560m",
+ "revision": "ac2ae5fab2ce3f9f40dc79b5ca9f637430d24971",
+ "fp32": 30.708332374673667,
+ "bf16 with fp32": {
+  "nothing": {
+   "perplexity": 34.819688888987386,
+   "vs_fp32": 0.1338840697746424
+  },
+  "attention": {
+   "perplexity": 34.886875233180646,
+   "vs_fp32": 0.1360719562210153
+  },
+  "mlp": {
+   "perplexity": 34.79778563502718,
+   "vs_fp32": 0.1331708023235494
+  },
+  "layernorms": {
+   "perplexity": 34.819688888987386,
+   "vs_fp32": 0.1338840697746424
+  },
+  "embedding layernorm": {
+   "perplexity": 34.819688888987386,
+   "vs_fp32": 0.1338840697746424
+  },
+  "lm head": {
+   "perplexity": 30.8927419789464,
+   "vs_fp32": 0.006005197612906521
+  }
+ }
+}

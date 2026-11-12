@@ -13,8 +13,8 @@ unembedding in fp32, bf16 with attention and the unembedding in fp32) this measu
 
 fp32 is the reference. everything else is reported as a distance from it.
 
-usage: python scripts/bf16_audit.py [n_prompts] [model ...]
-writes evidence/bf16_audit/<model>.json
+usage: python scripts/bf16_audit.py [n_prompts] [model ...] [--task capitals]
+writes evidence/bf16_audit/<model>.json, or evidence/bf16_audit_capitals/<model>.json
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from kerneltrace.core.manifest import configure_determinism, environment
 from kerneltrace.interventions.patching import Patch, margins, run
 from kerneltrace.models.adapter import load, load_tokenizer
 from kerneltrace.models.precision import drop_invariant_key_bias, upcast_attention
-from kerneltrace.tasks import ioi
+from kerneltrace.tasks import capitals, ioi
 from kerneltrace.tasks.preflight import behavioural_check, single_token, structural_check
 
 MODELS = {
@@ -48,6 +48,7 @@ SETTINGS = (("fp32", "float32", False, False, False), ("bf16", "bfloat16", False
             ("bf16, key bias dropped", "bfloat16", False, False, True),
             ("bf16, key bias dropped + fp32 head", "bfloat16", True, False, True))
 OUT = Path("evidence/bf16_audit")
+OUTS = {"ioi": OUT, "capitals": Path("evidence/bf16_audit_capitals")}
 
 
 def bf16_step(x: float) -> float:
@@ -55,10 +56,13 @@ def bf16_step(x: float) -> float:
     return 2.0 ** (math.floor(math.log2(abs(x))) - 7) if x else 0.0
 
 
-def pick_prompts(tok, adapter, n):
-    """ioi pairs that tokenize cleanly and that the fp32 model actually gets right."""
-    names_ok = lambda name: single_token(tok, " " + name) is not None
-    pool = ioi.generate("discovery", 200, 7, names_ok) + ioi.generate("holdout", 200, 7, names_ok)
+def pick_prompts(tok, adapter, n, task="ioi"):
+    """task pairs that tokenize cleanly and that the fp32 model actually gets right."""
+    if task == "capitals":
+        pool = capitals.generate(3000)
+    else:
+        names_ok = lambda name: single_token(tok, " " + name) is not None
+        pool = ioi.generate("discovery", 200, 7, names_ok) + ioi.generate("holdout", 200, 7, names_ok)
     keep = []
     for raw in pool:
         case = structural_check(raw, tok, 48)[0]
@@ -133,11 +137,12 @@ def measure(adapter, case, fp32_logits):
             "answer_logit": answer_logit, "restore_same_shape": same, "restore_sweep_batched": sweep}
 
 
-def audit(name, n):
+def audit(name, n, task="ioi"):
     model_id, rev = MODELS[name]
     configure_determinism(0, True)
     tok = load_tokenizer(model_id, rev)
-    path = OUT / f"{name}.json"
+    out = OUTS[task]
+    path = out / f"{name}.json"
     # settings already on disk are kept, so adding a setting only runs the new one
     result = (json.loads(path.read_text(encoding="utf-8")) if path.exists()
               else {"model": model_id, "revision": rev, "settings": {}, "prompts": []})
@@ -146,7 +151,7 @@ def audit(name, n):
         if label in result["settings"] and len(result["settings"][label]["rows"]) == n:
             continue
         if cases is None:  # chosen on the fp32 reference, then held fixed
-            cases = pick_prompts(tok, load(model_id, rev, "eager", "float32", "cuda"), n)
+            cases = pick_prompts(tok, load(model_id, rev, "eager", "float32", "cuda"), n, task)
             torch.cuda.empty_cache()
             if result["prompts"] and [c.case.case_id for c in cases] != [p["case_id"] for p in result["prompts"]]:
                 raise RuntimeError(f"{name}: picked different prompts than the ones on disk")
@@ -172,12 +177,18 @@ def audit(name, n):
         del adapter
         gc.collect()
         torch.cuda.empty_cache()
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result), encoding="utf-8", newline="\n")
     print(f"wrote {path}", flush=True)
 
 
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 48
-    for name in sys.argv[2:] or list(MODELS):
-        audit(name, n)
+    args = sys.argv[1:]
+    task = "ioi"
+    if "--task" in args:
+        i = args.index("--task")
+        task = args[i + 1]
+        del args[i:i + 2]
+    n = int(args[0]) if args else 48
+    for name in args[1:] or list(MODELS):
+        audit(name, n, task)

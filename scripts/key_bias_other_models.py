@@ -69,6 +69,11 @@ def drop_invariant(model) -> float:
         for blk in model.transformer.h:
             kb = blk.self_attention.query_key_value.bias.view(cfg.n_head, 3, hd)[:, 1]
             removed = max(removed, float(kb.norm(dim=-1).max())); kb.zero_()
+    elif arch == "gpt_neox":
+        hd = cfg.hidden_size // cfg.num_attention_heads
+        for layer in model.gpt_neox.layers:
+            kb = layer.attention.query_key_value.bias.view(cfg.num_attention_heads, 3, hd)[:, 1, layer.attention.rotary_ndims:]
+            removed = max(removed, float(kb.norm(dim=-1).max())); kb.zero_()
     elif arch == "qwen2":
         # full rotary, so nothing is exactly invariant. the dims that turn under 0.1 rad across 4096
         # positions are close: their part of q.b barely changes from key to key. this is approximate.

@@ -1,0 +1,55 @@
+{
+ "bloom-560m": {
+  "repo": "bigscience/bloom-560m",
+  "revision": "ac2ae5fab2ce3f9f40dc79b5ca9f637430d24971",
+  "settings": {
+   "fp32, as released": {
+    "perplexity": 30.708332374673667,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0
+   },
+   "bf16, as released": {
+    "perplexity": 34.819688888987386,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.1338840697746424
+   },
+   "fp16, as released": {
+    "perplexity": 30.761237581742233,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0017228290492321552
+   },
+   "fp32, relative alibi": {
+    "perplexity": 30.708328936034185,
+    "nonfinite_windows": 0,
+    "vs_fp32": -1.1197740856783156e-07
+   },
+   "bf16, relative alibi": {
+    "perplexity": 34.677106235194934,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.12924094386168838
+   },
+   "fp16, relative alibi": {
+    "perplexity": 30.765802656474797,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0018714882039159164
+   },
+   "fp32, relative alibi + bias dropped": {
+    "perplexity": 30.70834062741,
+    "nonfinite_windows": 0,
+    "vs_fp32": 2.6874583203273517e-07
+   },
+   "bf16, relative alibi + bias dropped": {
+    "perplexity": 34.733710340043814,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.1310842254882596
+   },
+   "fp16, relative alibi + bias dropped": {
+    "perplexity": 30.743822664811635,
+    "nonfinite_windows": 0,
+    "vs_fp32": 0.0011557218316171625
+   }
+  },
+  "relative alibi: fp32 max logit change": 0.0013580322265625,
+  "relative alibi + bias dropped: fp32 max logit change": 0.0024261474609375
+ }
+}
