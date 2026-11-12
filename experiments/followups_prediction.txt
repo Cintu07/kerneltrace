@@ -55,3 +55,13 @@ C. a second task family (scripts/bf16_audit.py --task capitals)
     on ioi.
 
 any of these can come out wrong. whatever happens goes in the readme.
+
+
+added after part A ran (bloom-560m: dropping the key bias cut its largest offset from 5,848 to 191, so
+prediction 4 was wrong, but 3.2% of its attention rows still move by over 0.1 in bf16), before this run.
+transformers adds bloom's alibi as slope * key_position, which is slope * query_position (the same for
+every key of a query, so softmax ignores it) plus slope * (key - query). the first part is another
+shared offset, up to about 360 at position 511, where bf16 steps by 2.
+
+16. bloom-560m: writing the alibi as slope * (key - query), which is exact in fp32, brings bf16
+    wikitext perplexity from +13.4% to within 2% of fp32.
