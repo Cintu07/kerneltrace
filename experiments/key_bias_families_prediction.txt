@@ -16,3 +16,11 @@ with bf16, and the training experiment says both grow it. i don't know gpt-2's t
    bigger than 5x its query bias.
 6. somewhere in the survey there is a model with a key bias whose invariant part is under 2x its query
    bias, so the growth is not universal.
+
+added after the first survey pass (santacoder 384, gpt-2 small 9.5, opt-125m 7.6), before running
+scripts/key_bias_other_models.py:
+
+7. santacoder: bf16 perplexity at least 5% worse than fp32 on code.
+8. santacoder: dropping the invariant key bias moves fp32 logits by at most 0.01, and brings bf16 within
+   1% of fp32.
+9. opt-125m: bf16 within 2% of fp32 with the bias in place. its invariant part is small.
