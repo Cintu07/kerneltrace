@@ -35,3 +35,13 @@ consistent gradient still gets full-size steps. sgd does not, and a large eps do
    below 1e-3 in fp32 adam, above 1e-2 in fp16 adam.
 8. final validation loss of fp16 adam within 2% of fp32 adam. the growth does not hurt training
    at this scale.
+
+added after runs 1-5 finished and were scored (6 of 8 held), before this run:
+
+  fp16 adam fp32 attention   autocast fp16 everywhere except inside each attention module, which
+                             runs in fp32. the sgd run moved no bias at all, so it can't separate
+                             adam from anything else. this one asks whether the low-precision
+                             attention backward is where the invariant gradient comes from.
+
+9. fp16 adam fp32 attention: invariant norm below 0.04, within 10x of fp32 adam's 0.004 and under
+   an eighth of fp16 adam's 0.340.
