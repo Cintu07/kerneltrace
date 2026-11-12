@@ -1,0 +1,57 @@
+predictions for three follow-up experiments, written and committed before any of them was run.
+
+what i know going in: santacoder's invariant key bias is 384 (query bias 7), it gives nan on all 32
+fp16 windows and is fine in bf16 (+0.1%), and dropping the bias fixes fp16. bloom-560m's invariant
+part is 183 but dropping it did not change its bf16 perplexity (+13.4% either way). pythia-410m's
+invariant part is 132. baligar 2026 found pythia-410m-deduped's fp32 vs fp64 interaction floor is
+10x gpt-2-medium's (1.25e-4 vs 1.2e-5). i have not measured pythia-410m-deduped's key bias.
+
+
+A. score offsets outside pythia (scripts/score_offsets.py)
+   attention scores captured at softmax in fp32 on 4 windows of 512 tokens, with and without the
+   invariant key bias. "offset" is the mean score over the keys a query sees, "spread" is max minus
+   min. "bf16 damage" is the total variation distance between softmax of the fp32 scores and softmax
+   of the same scores rounded to bf16.
+
+1. santacoder: the largest raw q.k (before the 1/sqrt(d) scale) is over 65,504 somewhere, so fp16
+   overflows there. with the invariant bias dropped it is under 65,504 everywhere.
+2. santacoder: the share of attention rows with bf16 damage over 0.1 is under 1%, which is why bf16
+   was fine.
+3. pythia-160m: the share of rows with bf16 damage over 0.1 is above 1% with the bias, and dropping
+   the bias cuts it at least 10x.
+4. bloom-560m: dropping the bias cuts its largest offset by less than half, so the bias is not what
+   sets its offsets, matching the perplexity result.
+5. qwen2.5-0.5b: zeroing the slow-dim key bias cuts its largest offset by at least half.
+
+
+B. the baligar link (scripts/patching_floor.py)
+   ioi prompts the fp32 model solves, 20 per model. residual stream patching, corrupt to clean, at
+   4 depths x 2 positions (the flipped token and the last token), 28 pairs per prompt, full
+   displacement. interaction q = f11 - f10 - f01 + f00 on the logit difference. fp64 is the
+   reference, with the softmax and rotary kept in fp64 (hf hardcodes both to fp32). floor = median
+   |q32 - q64|, as in baligar.
+
+6. pythia-410m-deduped has an invariant key bias over 50.
+7. pythia-410m-deduped: dropping the invariant key bias lowers the fp32 floor at least 3x.
+8. after the drop, pythia-410m-deduped's fp32 floor is within 3x of gpt-2-medium's.
+9. gpt-2-medium (invariant part 2.6): dropping it moves its fp32 floor by less than 1.5x either way.
+10. the edit is exact: fp64 interactions with and without the bias agree to 1e-9 on every pair.
+11. bf16 (new, baligar did not test it): on pythia-410m-deduped, more than half of the pairs have a
+    bf16 error larger than the fp64 interaction itself, and dropping the bias at least halves that
+    share.
+
+
+C. a second task family (scripts/bf16_audit.py --task capitals)
+   "the capital of france is the city of" -> paris, corrupted by swapping the country. this is factual
+   recall, which leans on mid-layer mlps, where ioi leans on attention. same 4 models, same 6
+   settings, same measurements as the ioi audit, up to 48 prompts the fp32 model gets right.
+
+12. pythia-410m: bf16 changes mlp restoration by a median of at least 0.05 (sweep), and dropping the
+    key bias brings that under 0.02. on ioi it was 0.107 and 0.007.
+13. pythia-160m: the bf16 top-3 mlp layers differ from fp32's. with attention and the head in fp32
+    they match.
+14. pythia-1b and gpt-2: bf16 median sweep error under 0.03.
+15. pythia-160m: the fp32 head alone makes it worse than plain bf16 (higher median sweep error), as
+    on ioi.
+
+any of these can come out wrong. whatever happens goes in the readme.
