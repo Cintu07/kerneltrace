@@ -46,9 +46,23 @@ the predictions were written down and committed before the run, in `experiments/
 
 ## where the offsets come from
 
-the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q · b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100. i don't know what pushes it. my guess is adam turning tiny numerical gradients into full-size steps, but that's untested.
+the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q · b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100.
 
 ![the key bias](docs/figures/x_key_bias.png)
+
+## why it grows
+
+the cerebras-gpt paper (2023, appendix a.2) already noticed key biases growing fast in fp16 training and blamed underflow in the softmax gradients. it didn't test that. so i trained a small pythia-shaped model from scratch, 4 layers with rotary on a quarter of each head, the same seed and data every time, and changed only the precision or the optimizer.
+
+![why it grows](docs/figures/x_key_bias_training.png)
+
+in fp32 the invariant part of the key bias ends at 0.004 after 3,000 steps. in fp16 it's 0.340, and in bf16 0.504. the loss curves of the three runs are the same to three decimals, so the models learn the same thing. the difference is all in the part softmax can't see.
+
+the gradient explains it. the invariant part's gradient is the row sum of the softmax score gradient times q, and that sum is zero in exact math. in fp16 the score gradient gets cast down before the matmul, the sum stops being zero, and the invariant part gets a gradient about 2,600 times smaller than the rotary part's. adam divides each step by the gradient's own recent size, so that tiny gradient gets a step 1.16 times as big as the rotary part's. in fp32 the gradient is another 800 times smaller, it sits under adam's eps of 1e-8, and the step comes out near zero.
+
+two controls pin it down. fp16 everywhere except attention, which runs in fp32, ends at 0.004, the same as full fp32. so the leak is in the attention backward. adam with eps 1e-4 in fp16 ends at 0.000, but it also slows every other small weight, and the rotary part only reaches 2.18 instead of 4.04. the run doesn't show where the sign of the leak comes from, or how far it would have gone over pythia's 143,000 steps.
+
+nine predictions, in `experiments/key_bias_training_prediction.txt`, the ninth added before its run. seven held. the invariant part never got bigger than the rotary part in 3,000 steps (0.34 against 4.04), and i'd guessed it would be twice as big. the fp16 gradient ratio was 4e-4, not above 1e-2. the sgd run moved no bias at all, rotary part included, so it says nothing about adam and the eps run carries that instead.
 
 it reaches past patching. on wikitext-2, pythia-70m's perplexity goes from 68 to 659 in bf16. 160m gets 171% worse, 410m 20%, 1.4b almost 6%. in fp16, 70m, 160m, 410m and 1.4b give nan on every window.
 
@@ -69,6 +83,7 @@ python scripts/bf16_batch_check.py                 # one prompt, two batch sizes
 python scripts/bf16_audit.py && python scripts/bf16_summary.py   # the bf16 audit, about 15 minutes
 python scripts/key_bias.py                         # parity of the bias edit, training checkpoints, the whole suite
 python scripts/lm_quality.py                       # wikitext-2 perplexity in fp32, bf16 and fp16
+python scripts/key_bias_training.py && python scripts/key_bias_training_summary.py   # train it six ways, about 30 minutes
 ```
 
 a run writes a folder under `runs/`. inside is the manifest (model commit, library and driver versions, gpu, tf32 and determinism switches, git state), the claim with its final status, every generated prompt with the reason any were rejected, raw per-case results, the kernels the profiler saw, and a report.

@@ -490,6 +490,71 @@ def key_bias():
     save("x_key_bias", E)
 
 
+def key_bias_training():
+    d = EV / "key_bias_training"
+    runs = {}
+    for p in sorted(d.glob("*.json")):
+        if p.name != "summary.json":
+            r = json.loads(p.read_text(encoding="utf-8"))
+            runs[r["run"]] = r
+    summ = json.loads((d / "summary.json").read_text(encoding="utf-8"))["runs"]
+    E = [text(40, 26, "why it grows: low-precision attention, then adam", 34, INK),
+         text(42, 78, "a small pythia-shaped model trained from scratch five ways. same seed, same data, same loss curve. "
+                      "only the part of the key bias softmax can't see behaves differently.", 18, GREY)]
+    gx, gy, gw, gh, top, steps = 90, 560, 620, 360, 0.6, 3000
+    X = lambda s: gx + s / steps * gw
+    Y = lambda v: gy - v / top * gh
+    E.append(text(40, 140, "invariant key bias over training, largest layer", 22, INK))
+    for g in (0.2, 0.4, 0.6):
+        E.append(line([(gx, Y(g)), (gx + gw, Y(g))], RULE, 1, dashed=True))
+        E.append(text(gx - 52, Y(g) - 10, f"{g:.1f}", 15, GREY, font=CODE))
+    E.append(line([(gx, gy), (gx + gw, gy)], INK, 2))
+    for s in (0, 1000, 2000, 3000):
+        E.append(text(X(s) - 30, gy + 12, f"{s // 1000}k" if s else "0", 15, GREY, align="center", w=60, font=CODE))
+    E.append(text(gx, gy + 40, "training step", 15, GREY))
+    style = {"bf16 adam": (RAMP[7], 3, False), "fp16 adam": (BLUE, 3, False),
+             "fp32 adam": (GREY, 2, False), "fp16 adam fp32 attention": (GREY, 2, True),
+             "fp16 adam eps 1e-4": (GREY, 2, True)}
+    for name, (color, width, dashed) in style.items():
+        rows = [r for r in runs[name]["log"] if "invariant" in r]
+        E.append(line([(X(r["step"]), Y(max(r["invariant"]))) for r in rows], color, width, dashed=dashed))
+    end = lambda n: summ[n]["invariant"]
+    E.append(text(gx + gw + 12, Y(end("bf16 adam")) - 12, f"bf16  {end('bf16 adam'):.2f}", 17, RAMP[7], font=CODE))
+    E.append(text(gx + gw + 12, Y(end("fp16 adam")) - 12, f"fp16  {end('fp16 adam'):.2f}", 17, BLUE, font=CODE))
+    E.append(text(gx + gw + 12, gy - 70, "fp32, or fp16 with\nattention in fp32,\nor fp16 with adam\neps 1e-4: "
+                  f"{max(end('fp32 adam'), end('fp16 adam fp32 attention'), end('fp16 adam eps 1e-4')):.3f}",
+                  15, GREY))
+    # right: the mechanism in numbers
+    tx = 1010
+    E.append(text(tx, 140, "where the growth comes from", 22, INK))
+    cols = [tx, tx + 250, tx + 380, tx + 530, tx + 680]
+    for c, h in zip(cols, ["run", "invariant\nat 3k", "gradient,\ninvariant /\nrotary", "adam step,\ninvariant /\nrotary",
+                           "val\nloss"]):
+        E.append(text(c, 182, h, 15, GREY))
+    order = ["fp32 adam", "fp16 adam", "bf16 adam", "fp16 adam fp32 attention", "fp16 adam eps 1e-4"]
+    labels = {"fp32 adam": "fp32", "fp16 adam": "fp16", "bf16 adam": "bf16",
+              "fp16 adam fp32 attention": "fp16, attention fp32", "fp16 adam eps 1e-4": "fp16, adam eps 1e-4"}
+    for i, n in enumerate(order):
+        f, y = summ[n], 268 + i * 46
+        hot = n in ("fp16 adam", "bf16 adam")
+        E.append(text(cols[0], y, labels[n], 18, INK))
+        for c, v in zip(cols[1:], [f"{f['invariant']:.3f}", f"{f['median_grad_ratio']:.0e}",
+                                   f"{f['median_step_ratio']:.2f}", f"{f['val_loss']:.2f}"]):
+            E.append(text(c, y, v, 16, BLUE if hot and c in (cols[1], cols[3]) else INK, font=CODE))
+        E.append(line([(tx, y + 34), (tx + 760, y + 34)], RULE, 1))
+    g16, s16 = summ["fp16 adam"]["median_grad_ratio"], summ["fp16 adam"]["median_step_ratio"]
+    E.append(text(tx, 268 + len(order) * 46 + 12,
+                  f"in fp16 the invariant part's gradient is about {round(1 / g16, -2):,.0f}x smaller than the rotary part's,\n"
+                  f"and adam still gives it a step {s16:.2f}x as big. in fp32 the gradient sits under adam's eps\n"
+                  "and the step is near zero. a big eps kills the growth, and slows every other small\n"
+                  f"weight too: the rotary part only reaches {summ['fp16 adam eps 1e-4']['rotary']:.2f}.", 15, GREY))
+    E.append(text(40, gy + 92, "keeping only attention in fp32 is enough to stop it. the leak is in the attention backward, "
+                               "and adam's normalisation turns it into full-size steps.", 20, INK))
+    E.append(text(40, gy + 128, "github.com/Cintu07/kerneltrace   scripts/key_bias_training.py   "
+                                "experiments/key_bias_training_prediction.txt", 17, GREY, font=CODE))
+    save("x_key_bias_training", E)
+
+
 # --- the readme diagram: tall enough to read at github's column width
 def method():
     W = 1100
@@ -546,6 +611,7 @@ def method():
 if __name__ == "__main__":
     import sys
 
-    figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit, key_bias)}
+    figures = {f.__name__: f for f in (method, verdicts, trace, numerical, shuffle, noise, bf16_head, bf16_audit, key_bias,
+                                             key_bias_training)}
     for name in sys.argv[1:] or figures:
         figures[name]()

@@ -1,0 +1,117 @@
+{
+ "runs": {
+  "bf16 adam": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 0.5036978721618652,
+   "rotary": 4.029770374298096,
+   "invariant_over_rotary": 0.21768474350460504,
+   "query": 1.5331532955169678,
+   "median_grad_ratio": 0.0031029238656882993,
+   "median_step_ratio": 1.4462658086472064,
+   "val_loss": 5.136648821830749
+  },
+  "fp16 adam": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 0.340312123298645,
+   "rotary": 4.041523456573486,
+   "invariant_over_rotary": 0.1569314782518125,
+   "query": 1.531351923942566,
+   "median_grad_ratio": 0.00038298654798963184,
+   "median_step_ratio": 1.158040351387017,
+   "val_loss": 5.136314105987549
+  },
+  "fp16 adam eps 1e-4": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 0.00014657371502835304,
+   "rotary": 2.1842944622039795,
+   "invariant_over_rotary": 0.00013278716983833582,
+   "query": 1.4386221170425415,
+   "median_grad_ratio": 0.0004113554759137732,
+   "median_step_ratio": 0.0007593712147731818,
+   "val_loss": 5.058171200752258
+  },
+  "fp16 adam fp32 attention": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 0.004327056929469109,
+   "rotary": 4.039895534515381,
+   "invariant_over_rotary": 0.0018010718498372444,
+   "query": 1.5296754837036133,
+   "median_grad_ratio": 4.948654476220087e-07,
+   "median_step_ratio": 0.008115533405440942,
+   "val_loss": 5.136429047584533
+  },
+  "fp16 sgd": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 1.166462055834927e-07,
+   "rotary": 0.00020698181469924748,
+   "invariant_over_rotary": 0.0006877693849944766,
+   "query": 0.005243121646344662,
+   "median_grad_ratio": 0.9217808426545987,
+   "median_step_ratio": 0.8885079614857285,
+   "val_loss": 6.3944189071655275
+  },
+  "fp32 adam": {
+   "step": 2999,
+   "diverged": false,
+   "invariant": 0.0038864261005073786,
+   "rotary": 4.038699150085449,
+   "invariant_over_rotary": 0.0016179164191429502,
+   "query": 1.5293856859207153,
+   "median_grad_ratio": 4.905396300062564e-07,
+   "median_step_ratio": 0.007902029311416828,
+   "val_loss": 5.136315870285034
+  }
+ },
+ "predictions": [
+  {
+   "n": 1,
+   "prediction": "fp32 adam invariant < 1.0",
+   "held": true
+  },
+  {
+   "n": 2,
+   "prediction": "fp16 adam invariant > 2x rotary in some layer",
+   "held": false
+  },
+  {
+   "n": 3,
+   "prediction": "fp16 adam invariant >= 5x fp32 adam",
+   "held": true
+  },
+  {
+   "n": 4,
+   "prediction": "bf16 adam invariant >= fp16 adam",
+   "held": true
+  },
+  {
+   "n": 5,
+   "prediction": "fp16 adam eps 1e-4 invariant <= half of fp16 adam",
+   "held": true
+  },
+  {
+   "n": 6,
+   "prediction": "fp16 sgd invariant < 1.0",
+   "held": true
+  },
+  {
+   "n": 7,
+   "prediction": "grad ratio < 1e-3 in fp32 adam and > 1e-2 in fp16 adam",
+   "held": false
+  },
+  {
+   "n": 8,
+   "prediction": "fp16 adam val loss within 2% of fp32 adam",
+   "held": true
+  },
+  {
+   "n": 9,
+   "prediction": "fp16 adam fp32 attention invariant < 0.04",
+   "held": true
+  }
+ ]
+}
