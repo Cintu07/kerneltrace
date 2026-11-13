@@ -49,11 +49,21 @@ SETTINGS = (("fp32", "float32", False, False, False), ("bf16", "bfloat16", False
             ("bf16, key bias dropped + fp32 head", "bfloat16", True, False, True))
 OUT = Path("evidence/bf16_audit")
 OUTS = {"ioi": OUT, "capitals": Path("evidence/bf16_audit_capitals")}
+ATTN = "eager"  # --attn sdpa runs pytorch's fused attention (memory-efficient kernel) instead
 
 
 def bf16_step(x: float) -> float:
     """distance between neighbouring bf16 values near x (8 bits of significand)."""
     return 2.0 ** (math.floor(math.log2(abs(x))) - 7) if x else 0.0
+
+
+def sdpa_backend():
+    """force the memory-efficient sdpa kernel, so the run cannot silently fall back to the math path."""
+    import contextlib
+    if ATTN != "sdpa":
+        return contextlib.nullcontext()
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+    return sdpa_kernel([SDPBackend.EFFICIENT_ATTENTION])
 
 
 def pick_prompts(tok, adapter, n, task="ioi"):
@@ -141,7 +151,7 @@ def audit(name, n, task="ioi"):
     model_id, rev = MODELS[name]
     configure_determinism(0, True)
     tok = load_tokenizer(model_id, rev)
-    out = OUTS[task]
+    out = OUTS[task] if ATTN == "eager" else Path(f"evidence/bf16_audit_{ATTN}")
     path = out / f"{name}.json"
     # settings already on disk are kept, so adding a setting only runs the new one
     result = (json.loads(path.read_text(encoding="utf-8")) if path.exists()
@@ -155,7 +165,7 @@ def audit(name, n, task="ioi"):
             torch.cuda.empty_cache()
             if result["prompts"] and [c.case.case_id for c in cases] != [p["case_id"] for p in result["prompts"]]:
                 raise RuntimeError(f"{name}: picked different prompts than the ones on disk")
-        adapter = load(model_id, rev, "eager", dtype, "cuda")
+        adapter = load(model_id, rev, ATTN, dtype, "cuda")
         if fp32_attention:
             upcast_attention(adapter)
         if drop_bias:
@@ -166,7 +176,9 @@ def audit(name, n, task="ioi"):
                                  for c in cases]
             result["environment"] = {k: v for k, v in environment().items() if k != "packages"}
         t0 = time.time()
-        rows = [measure(adapter, c, fp32_logits) for c in cases]
+        with sdpa_backend():
+            rows = [measure(adapter, c, fp32_logits) for c in cases]
+        result["attn_implementation"] = ATTN
         result["settings"][label] = {"dtype": dtype, "fp32_logits": fp32_logits,
                                      "fp32_attention": fp32_attention,
                                      "drop_key_bias": drop_bias, "rows": rows,
@@ -185,6 +197,10 @@ def audit(name, n, task="ioi"):
 if __name__ == "__main__":
     args = sys.argv[1:]
     task = "ioi"
+    if "--attn" in args:
+        i = args.index("--attn")
+        ATTN = args[i + 1]
+        del args[i:i + 2]
     if "--task" in args:
         i = args.index("--task")
         task = args[i + 1]

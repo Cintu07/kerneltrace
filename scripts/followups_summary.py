@@ -86,6 +86,14 @@ def main():
             m["bias dropped"]["cast_error_median"] * 10 <= m["as released"]["cast_error_median"] for m in sc.values())
         v["19 410m-deduped largest offset over 10,000"] = d["offsets_fp32"]["largest_offset"] > 10000
         notes["fp64_softmax_cast"] = sc
+    sd = Path("evidence/bf16_audit_sdpa")
+    if (sd / "pythia-410m.json").exists() and "pythia-410m" in caps:
+        eager = {m: summarize(Path("evidence/bf16_audit") / f"{m}.json") for m in ("pythia-160m", "pythia-410m")}
+        fused = {m: summarize(sd / f"{m}.json") for m in ("pythia-160m", "pythia-410m")}
+        E = lambda d, m, s: d[m]["settings"][s]["restore_err_sweep_median"]
+        v["20 sdpa keeps at least half the eager bf16 error on 160m and 410m"] = all(
+            E(fused, m, "bf16") >= 0.5 * E(eager, m, "bf16") for m in fused)
+        v["21 sdpa, bias dropped: pythia-410m under 0.02"] = E(fused, "pythia-410m", "bf16, key bias dropped") < 0.02
     ba = load(FAM / "bloom_alibi.json") or {}
     if "bloom-560m" in ba:
         v["16 bloom-560m relative alibi brings bf16 within 2%"] = abs(

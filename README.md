@@ -102,13 +102,17 @@ the patching audit was ioi only. capital cities is the second family: "the capit
 
 the picture holds. pythia-410m's median error is 0.024 in bf16 and 0.002 with the bias dropped. pythia-160m needs the drop and an fp32 head together (0.053 to 0.004), because its capital logits sit near 830 where bf16 steps by 4, and either fix alone leaves most of the error. pythia-1b and gpt-2 stay under 0.013 in plain bf16, as they did on ioi, since neither has offsets big enough for bf16 to round away the spread between keys.
 
+## with fused attention
+
+everything above used the plain eager attention, which rounds the scores to bf16 before softmax. pytorch's fused attention (sdpa, the memory-efficient kernel, since this windows build has no flash attention) keeps the scores and softmax in fp32, but each key is still stored in bf16 with the bias already added. `python scripts/bf16_audit.py 48 pythia-160m pythia-410m --attn sdpa` reruns the ioi audit with it. pythia-160m's median error is 0.060 against 0.098 eager, and only 2 prompts lose their effect instead of 25. pythia-410m's is 0.027 against 0.107. dropping the bias still takes 410m to 0.007. so the fused kernel removes a lot of it and not all of it. `scripts/bootstrap_ci.py` puts 95% intervals over prompts on these and on the floors, and none of the comparisons above overlap.
+
 ## the offsets themselves, and bloom
 
 `scripts/score_offsets.py` catches every attention score row at softmax in fp32, on 4 windows of 512 tokens, and checks what bf16 rounding of those scores alone does to the attention. on pythia-160m it moves 45.6% of rows by more than 0.1 in total variation, and 0.15% with the bias dropped. santacoder's raw q·k reaches 148,785, more than twice fp16's 65,504, which is the nan. dropped, it peaks at 1,579.
 
 bloom-560m's 13.4% bf16 loss turned out to be something else. dropping the bias cut its largest offset from 5,848 to 191 and didn't move the perplexity. writing its alibi as slope·(key - query), which removes another shared offset that transformers adds, didn't either (+12.9%). fp16 is fine (+0.2%), so it's bf16's short significand somewhere. `scripts/bloom_bisect.py` keeps one group of modules in fp32 at a time: attention, mlps and layernorms change nothing, the head alone takes it to +0.6%. its logits sit near 430, where bf16 steps by 2.
 
-nineteen predictions for this part, in `experiments/followups_prediction.txt`, all committed before their runs. fourteen held, including all three about the softmax cast. santacoder moves 3.5% of its attention rows in bf16, not under 1%, and still loses only 0.1% perplexity. bloom's offsets did come from the bias, i guessed they didn't. dropping the bias cut bf16's bad pairs on 410m-deduped from 71% to 46%, short of half. capitals on 410m showed 0.024 of bf16 error, not 0.05. and the alibi rewrite didn't fix bloom, which is what sent me to the bisect that found its head.
+twenty-one predictions for this part, in `experiments/followups_prediction.txt`, all committed before their runs. fifteen held, including all three about the softmax cast. i expected fused attention to keep at least half of the bf16 error on both pythias, and on 410m it kept a quarter. santacoder moves 3.5% of its attention rows in bf16, not under 1%, and still loses only 0.1% perplexity. bloom's offsets did come from the bias, i guessed they didn't. dropping the bias cut bf16's bad pairs on 410m-deduped from 71% to 46%, short of half. capitals on 410m showed 0.024 of bf16 error, not 0.05. and the alibi rewrite didn't fix bloom, which is what sent me to the bisect that found its head.
 
 ## run it
 
