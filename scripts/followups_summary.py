@@ -77,6 +77,15 @@ def main():
     if "pythia-1b" in caps and "gpt2" in caps:
         v["14 pythia-1b and gpt-2 capitals bf16 err under 0.03"] = all(
             S(n, "bf16")["restore_err_sweep_median"] < 0.03 for n in ("pythia-1b", "gpt2"))
+    sc = load(Path("evidence/patching_floor/fp64_softmax_cast.json")) or {}
+    if sc:
+        d = sc["pythia-410m-deduped"]
+        v["17 410m-deduped softmax cast error within 3x of its fp32 floor"] = (
+            d["as released"]["fp32_floor"] <= 3 * d["as released"]["cast_error_median"])
+        v["18 softmax cast error falls 10x with the drop on both models"] = all(
+            m["bias dropped"]["cast_error_median"] * 10 <= m["as released"]["cast_error_median"] for m in sc.values())
+        v["19 410m-deduped largest offset over 10,000"] = d["offsets_fp32"]["largest_offset"] > 10000
+        notes["fp64_softmax_cast"] = sc
     ba = load(FAM / "bloom_alibi.json") or {}
     if "bloom-560m" in ba:
         v["16 bloom-560m relative alibi brings bf16 within 2%"] = abs(

@@ -15,7 +15,10 @@
   "13 pythia-160m capitals bf16 top-3 differs, fp32 attention+head matches": true,
   "14 pythia-1b and gpt-2 capitals bf16 err under 0.03": true,
   "15 pythia-160m capitals fp32 head worse than bf16": true,
-  "16 bloom-560m relative alibi brings bf16 within 2%": false
+  "16 bloom-560m relative alibi brings bf16 within 2%": false,
+  "17 410m-deduped softmax cast error within 3x of its fp32 floor": true,
+  "18 softmax cast error falls 10x with the drop on both models": true,
+  "19 410m-deduped largest offset over 10,000": true
  },
  "capitals": {
   "gpt2": {
@@ -2028,6 +2031,38 @@
     "sign_disagree": 0.46785714285714286,
     "share_err_over_signal": 0.30178571428571427,
     "single_site_err_median": 0.1367185667038484
+   }
+  }
+ },
+ "fp64_softmax_cast": {
+  "pythia-410m-deduped": {
+   "offsets_fp32": {
+    "largest_offset": 55578.9296875,
+    "largest_offset_layer": 22,
+    "spread_there": 17.0390625
+   },
+   "as released": {
+    "cast_error_median": 0.00011019555399549574,
+    "fp32_floor": 0.00029737162483378654
+   },
+   "bias dropped": {
+    "cast_error_median": 2.515347683029745e-06,
+    "fp32_floor": 9.681708268871603e-06
+   }
+  },
+  "pythia-410m": {
+   "offsets_fp32": {
+    "largest_offset": 35797.91796875,
+    "largest_offset_layer": 22,
+    "spread_there": 41.609375
+   },
+   "as released": {
+    "cast_error_median": 5.5217095639825686e-05,
+    "fp32_floor": 0.00017465080374279296
+   },
+   "bias dropped": {
+    "cast_error_median": 2.3515447455935146e-07,
+    "fp32_floor": 3.3303902231551774e-06
    }
   }
  }

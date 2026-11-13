@@ -1,0 +1,32 @@
+{
+ "pythia-410m-deduped": {
+  "offsets_fp32": {
+   "largest_offset": 55578.9296875,
+   "largest_offset_layer": 22,
+   "spread_there": 17.0390625
+  },
+  "as released": {
+   "cast_error_median": 0.00011019555399549574,
+   "fp32_floor": 0.00029737162483378654
+  },
+  "bias dropped": {
+   "cast_error_median": 2.515347683029745e-06,
+   "fp32_floor": 9.681708268871603e-06
+  }
+ },
+ "pythia-410m": {
+  "offsets_fp32": {
+   "largest_offset": 35797.91796875,
+   "largest_offset_layer": 22,
+   "spread_there": 41.609375
+  },
+  "as released": {
+   "cast_error_median": 5.5217095639825686e-05,
+   "fp32_floor": 0.00017465080374279296
+  },
+  "bias dropped": {
+   "cast_error_median": 2.3515447455935146e-07,
+   "fp32_floor": 3.3303902231551774e-06
+  }
+ }
+}

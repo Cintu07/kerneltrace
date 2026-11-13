@@ -90,7 +90,9 @@ baligar (2026, computation 14(9):212) measured pair interactions, q = f11 - f10 
 
 ![the interaction floor](docs/figures/x_patching_floor.png)
 
-the floor (median |q32 - q64|) on pythia-410m-deduped is 3.0e-4 as released and 9.7e-6 with the bias dropped, 31 times lower. on pythia-410m it goes from 1.7e-4 to 3.3e-6, 52 times. gpt-2 medium, whose invariant part is 3.2, sits at 9.2e-6 both ways. so with the bias gone the two pythias land at or under gpt-2 medium, and the 10x gap is the bias. in fp64 the two versions of each model agree to 1e-11, so nothing about the model changed, only the rounding.
+the floor (median |q32 - q64|) on pythia-410m-deduped is 3.0e-4 as released and 9.7e-6 with the bias dropped, 31 times lower. on pythia-410m it goes from 1.7e-4 to 3.3e-6, 52 times. gpt-2 medium, whose invariant part is 2.6 per head, sits at 9.2e-6 both ways. so with the bias gone the two pythias land at or under gpt-2 medium, and the 10x gap is the bias. in fp64 the two versions of each model agree to 1e-11, so nothing about the model changed, only the rounding.
+
+baligar also found that transformers' gpt-neox softmax, which casts scores to fp32 even in an fp64 model, dominates the error of nominal fp64 runs. that cast only costs much when the scores carry a big offset, and they do: on these prompts pythia-410m-deduped's largest score offset is 55,579 against a spread of 17 between keys. `scripts/fp64_softmax_cast.py` runs fp64 with only the stock softmax. the cast alone gives an interaction error of 1.1e-4 on 410m-deduped, over a third of its whole fp32 floor. with the bias dropped it falls 44 times, and 235 times on pythia-410m.
 
 bf16, which baligar didn't test, is much worse. the bf16 floor is 0.06 to 1.4, the size of the interactions themselves, and on pythia-410m-deduped 71% of pairs have an error bigger than the interaction. dropping the bias takes that to 46%. interactions aren't readable in bf16 on any of the three models.
 
@@ -106,7 +108,7 @@ the picture holds. pythia-410m's median error is 0.024 in bf16 and 0.002 with th
 
 bloom-560m's 13.4% bf16 loss turned out to be something else. dropping the bias cut its largest offset from 5,848 to 191 and didn't move the perplexity. writing its alibi as slope·(key - query), which removes another shared offset that transformers adds, didn't either (+12.9%). fp16 is fine (+0.2%), so it's bf16's short significand somewhere. `scripts/bloom_bisect.py` keeps one group of modules in fp32 at a time: attention, mlps and layernorms change nothing, the head alone takes it to +0.6%. its logits sit near 430, where bf16 steps by 2.
 
-sixteen predictions for this part, in `experiments/followups_prediction.txt`, all committed before their runs. eleven held. santacoder moves 3.5% of its attention rows in bf16, not under 1%, and still loses only 0.1% perplexity. bloom's offsets did come from the bias, i guessed they didn't. dropping the bias cut bf16's bad pairs on 410m-deduped from 71% to 46%, short of half. capitals on 410m showed 0.024 of bf16 error, not 0.05. and the alibi rewrite didn't fix bloom, which is what sent me to the bisect that found its head.
+nineteen predictions for this part, in `experiments/followups_prediction.txt`, all committed before their runs. fourteen held, including all three about the softmax cast. santacoder moves 3.5% of its attention rows in bf16, not under 1%, and still loses only 0.1% perplexity. bloom's offsets did come from the bias, i guessed they didn't. dropping the bias cut bf16's bad pairs on 410m-deduped from 71% to 46%, short of half. capitals on 410m showed 0.024 of bf16 error, not 0.05. and the alibi rewrite didn't fix bloom, which is what sent me to the bisect that found its head.
 
 ## run it
 
@@ -128,6 +130,7 @@ python scripts/score_offsets.py                    # score offsets at softmax, a
 python scripts/patching_floor.py 20                # fp32 and bf16 interaction floors against fp64, about 45 minutes
 python scripts/bf16_audit.py 48 --task capitals    # the patching audit on the second task
 python scripts/bloom_alibi.py && python scripts/bloom_bisect.py   # what bloom's bf16 loss is and isn't
+python scripts/fp64_softmax_cast.py                # how much transformers' fp32 softmax costs an fp64 run, with and without the bias
 python scripts/followups_summary.py                # scores predictions 1-16
 ```
 
