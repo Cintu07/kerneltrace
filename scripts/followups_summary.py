@@ -94,6 +94,16 @@ def main():
         v["20 sdpa keeps at least half the eager bf16 error on 160m and 410m"] = all(
             E(fused, m, "bf16") >= 0.5 * E(eager, m, "bf16") for m in fused)
         v["21 sdpa, bias dropped: pythia-410m under 0.02"] = E(fused, "pythia-410m", "bf16, key bias dropped") < 0.02
+    tr = Path("evidence/key_bias_training")
+    if (tr / "seed2" / "fp32_adam.json").exists():
+        def end(sd, n):
+            r = json.loads((tr / sd / f"{n}.json").read_text(encoding="utf-8"))
+            return max([x for x in r["log"] if "invariant" in x][-1]["invariant"])
+        seeds = ("seed1", "seed2")
+        v["22 seeds 1-2: fp16 and bf16 invariant at least 10x fp32"] = all(
+            end(sd, n) >= 10 * end(sd, "fp32_adam") for sd in seeds for n in ("fp16_adam", "bf16_adam"))
+        v["23 seeds 1-2: fp16 with fp32 attention within 2x of fp32"] = all(
+            0.5 <= end(sd, "fp16_adam_fp32_attention") / end(sd, "fp32_adam") <= 2 for sd in seeds)
     ba = load(FAM / "bloom_alibi.json") or {}
     if "bloom-560m" in ba:
         v["16 bloom-560m relative alibi brings bf16 within 2%"] = abs(

@@ -20,7 +20,9 @@
   "18 softmax cast error falls 10x with the drop on both models": true,
   "19 410m-deduped largest offset over 10,000": true,
   "20 sdpa keeps at least half the eager bf16 error on 160m and 410m": false,
-  "21 sdpa, bias dropped: pythia-410m under 0.02": true
+  "21 sdpa, bias dropped: pythia-410m under 0.02": true,
+  "22 seeds 1-2: fp16 and bf16 invariant at least 10x fp32": true,
+  "23 seeds 1-2: fp16 with fp32 attention within 2x of fp32": true
  },
  "capitals": {
   "gpt2": {
