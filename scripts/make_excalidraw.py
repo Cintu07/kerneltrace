@@ -675,23 +675,19 @@ def patching_floor():
     tx, ty = 1210, 150
     E.append(text(tx, ty, "the same pairs in bf16", 22, INK))
     cols = [tx, tx + 250, tx + 400]
-    for c, h in zip(cols, ["", "error bigger
-than the effect", "sign
-flipped"]):
+    for c, h in zip(cols, ["", "error bigger\nthan the effect", "sign\nflipped"]):
         E.append(text(c, ty + 42, h, 15, GREY))
     y = ty + 104
     for n in order:
         for k, lab in (("bfloat16", "as released"), ("bfloat16, bias dropped", "bias dropped")):
             f = fl[n][k]
-            E.append(text(cols[0], y, f"{n}
-  {lab}", 15, INK))
+            E.append(text(cols[0], y, f"{n}\n  {lab}", 15, INK))
             E.append(text(cols[1], y + 8, f"{f['share_err_over_signal']:.0%}", 17, INK, font=CODE))
             E.append(text(cols[2], y + 8, f"{f['sign_disagree']:.0%}", 17, INK, font=CODE))
             y += 50
         E.append(line([(tx, y - 4), (tx + 520, y - 4)], RULE, 1))
         y += 8
-    E.append(text(tx, y + 8, "dropping the bias helps bf16 too, but the
-pairs are still mostly noise there.", 15, GREY))
+    E.append(text(tx, y + 8, "on the pythias dropping the bias helps bf16\ntoo, but the pairs are still mostly noise there.", 15, GREY))
     by = gy + len(order) * 120 + 70
     E.append(text(40, by, "fp64 interactions with and without the bias agree to 1e-11, so the edit changes nothing in exact math. "
                           "what it removes is fp32 rounding.", 20, INK))

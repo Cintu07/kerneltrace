@@ -46,7 +46,7 @@ the predictions were written down and committed before the run, in `experiments/
 
 ## where the offsets come from
 
-the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q Â· b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100.
+the key bias. in the dimensions rotary embeddings leave alone, a head's key bias adds q·b to the score of every key a query can see, the same number for every key. softmax subtracts it, so it changes nothing, and in exact math it gets no gradient. in pythia-160m it starts at zero and grows to a norm of 279 over training. the part rotary does touch, which the loss can see, stays under 20. reading the final weights of the whole pythia suite with range requests, 70m, 160m, 410m and 1.4b all carry one over 100.
 
 ![the key bias](docs/figures/x_key_bias.png)
 
@@ -74,7 +74,7 @@ it grows in some of them. santacoder's is 384 and bloom-560m's 183, against quer
 
 qwen2.5 has rotary on every dim, so none of its key bias is exactly invariant. but its rotary base is a million, and its slowest dims turn less than a tenth of a radian over 4,096 positions. that's where its key bias sits, 283 in 0.5b, 821 in 1.5b and 920 in 7b, against 35 to 120 in all the other dims. zeroing it there moves the fp32 logits by 0.18 and the perplexity by under 0.01%.
 
-big doesn't mean broken. `scripts/key_bias_other_models.py` runs perplexity with and without it. santacoder gives nan on every window in fp16, and with the invariant part dropped fp16 matches fp32. that edit moves the fp32 logits by 0.0015. but its bf16 is only 0.1% off. bloom-560m loses 13.4% in bf16 and dropping its 183 changes nothing, so its problem is somewhere else. qwen and opt are fine in both.
+big doesn't mean broken. `scripts/key_bias_other_models.py` runs perplexity with and without it. santacoder gives nan on every window in fp16, and with the invariant part dropped fp16 matches fp32. that edit moves the fp32 logits by 0.0015. but its bf16 is only 0.1% off. bloom-560m loses 13.4% in bf16 and dropping its 183 changes nothing. that one is its output logits, below. qwen and opt are fine in both.
 
 twelve predictions in `experiments/key_bias_families_prediction.txt`, five held. i expected the growth to be more common and to do more damage than it does. opt, bloom-7b1, gpt-neox-20b and qwen-1.5b all came in under what i guessed, santacoder broke in fp16 and not bf16, bloom's bf16 loss wasn't the bias, and qwen didn't overflow fp16. cerebras-gpt is gated now and wasn't checked.
 
@@ -83,6 +83,30 @@ it reaches past patching. on wikitext-2, pythia-70m's perplexity goes from 68 to
 zeroing that part of the bias is an exact edit, `drop_invariant_key_bias(adapter)`. in fp32 the logits move by at most 0.007. after it, pythia-410m runs in plain bf16 within 0.1% of fp32 and its patching sweep matches fp32, and fp16 is finite again on 70m, 160m and 410m. it doesn't cover everything. 70m and 160m also need the fp32 head, because their output logits are huge. 1.4b still overflows fp16, because hf multiplies q by k before scaling and that product hits 129,160 even without the bias. keeping attention and the head in fp32 handles every case here, within 0.6% of fp32 perplexity on all six models.
 
 the predictions for this part are in `experiments/key_bias_prediction.txt`, each batch committed before it ran. six held and three didn't. plain bf16 with the bias dropped wasn't enough for pythia-160m's patching sweep (median error 0.051, i'd said 0.02). the 25 prompts where bf16 saw no effect came back with the bias alone, when i'd guessed the output grid would keep more than 10 of them lost. and dropping the bias left 160m's bf16 perplexity 60% off instead of within 0.5%, which is how the second problem, its huge output logits, showed up.
+
+## the interaction floor
+
+baligar (2026, computation 14(9):212) measured pair interactions, q = f11 - f10 - f01 + f00 from four patched runs, in fp32 and fp64 on gpt-2 medium and pythia-410m-deduped. pythia's fp32 error came out ten times gpt-2's and the paper doesn't say why. pythia-410m carries an invariant key bias of 132, so `scripts/patching_floor.py` reruns that kind of measurement on ioi with and without it: residual stream patches at 4 depths and 2 positions, 28 pairs per prompt, 20 prompts, 560 pairs per model. the fp64 run keeps softmax and rotary in fp64. transformers casts both to fp32 for gpt-neox, which baligar also ran into.
+
+![the interaction floor](docs/figures/x_patching_floor.png)
+
+the floor (median |q32 - q64|) on pythia-410m-deduped is 3.0e-4 as released and 9.7e-6 with the bias dropped, 31 times lower. on pythia-410m it goes from 1.7e-4 to 3.3e-6, 52 times. gpt-2 medium, whose invariant part is 3.2, sits at 9.2e-6 both ways. so with the bias gone the two pythias land at or under gpt-2 medium, and the 10x gap is the bias. in fp64 the two versions of each model agree to 1e-11, so nothing about the model changed, only the rounding.
+
+bf16, which baligar didn't test, is much worse. the bf16 floor is 0.06 to 1.4, the size of the interactions themselves, and on pythia-410m-deduped 71% of pairs have an error bigger than the interaction. dropping the bias takes that to 46%. interactions aren't readable in bf16 on any of the three models.
+
+## a second task
+
+the patching audit was ioi only. capital cities is the second family: "the capital of france is the city of" against the same prompt with germany, 4 templates, 48 prompts each model gets right. it's recall, which leans on mlps where ioi leans on attention.
+
+the picture holds. pythia-410m's median error is 0.024 in bf16 and 0.002 with the bias dropped. pythia-160m needs the drop and an fp32 head together (0.053 to 0.004), because its capital logits sit near 830 where bf16 steps by 4, and either fix alone leaves most of the error. pythia-1b and gpt-2 stay under 0.013 in plain bf16, as they did on ioi, since neither has offsets big enough for bf16 to round away the spread between keys.
+
+## the offsets themselves, and bloom
+
+`scripts/score_offsets.py` catches every attention score row at softmax in fp32, on 4 windows of 512 tokens, and checks what bf16 rounding of those scores alone does to the attention. on pythia-160m it moves 45.6% of rows by more than 0.1 in total variation, and 0.15% with the bias dropped. santacoder's raw q·k reaches 148,785, more than twice fp16's 65,504, which is the nan. dropped, it peaks at 1,579.
+
+bloom-560m's 13.4% bf16 loss turned out to be something else. dropping the bias cut its largest offset from 5,848 to 191 and didn't move the perplexity. writing its alibi as slope·(key - query), which removes another shared offset that transformers adds, didn't either (+12.9%). fp16 is fine (+0.2%), so it's bf16's short significand somewhere. `scripts/bloom_bisect.py` keeps one group of modules in fp32 at a time: attention, mlps and layernorms change nothing, the head alone takes it to +0.6%. its logits sit near 430, where bf16 steps by 2.
+
+sixteen predictions for this part, in `experiments/followups_prediction.txt`, all committed before their runs. eleven held. santacoder moves 3.5% of its attention rows in bf16, not under 1%, and still loses only 0.1% perplexity. bloom's offsets did come from the bias, i guessed they didn't. dropping the bias cut bf16's bad pairs on 410m-deduped from 71% to 46%, short of half. capitals on 410m showed 0.024 of bf16 error, not 0.05. and the alibi rewrite didn't fix bloom, which is what sent me to the bisect that found its head.
 
 ## run it
 
@@ -100,6 +124,11 @@ python scripts/lm_quality.py                       # wikitext-2 perplexity in fp
 python scripts/key_bias_training.py && python scripts/key_bias_training_summary.py   # train it six ways, about 30 minutes
 python scripts/key_bias_families.py                # the invariant key bias in 23 checkpoints outside pythia
 python scripts/key_bias_other_models.py            # perplexity with and without it, santacoder, bloom, qwen, opt
+python scripts/score_offsets.py                    # score offsets at softmax, and what bf16 rounding does to them
+python scripts/patching_floor.py 20                # fp32 and bf16 interaction floors against fp64, about 45 minutes
+python scripts/bf16_audit.py 48 --task capitals    # the patching audit on the second task
+python scripts/bloom_alibi.py && python scripts/bloom_bisect.py   # what bloom's bf16 loss is and isn't
+python scripts/followups_summary.py                # scores predictions 1-16
 ```
 
 a run writes a folder under `runs/`. inside is the manifest (model commit, library and driver versions, gpu, tf32 and determinism switches, git state), the claim with its final status, every generated prompt with the reason any were rejected, raw per-case results, the kernels the profiler saw, and a report.
@@ -110,6 +139,6 @@ a run writes a folder under `runs/`. inside is the manifest (model commit, libra
 
 the status rules live in `kerneltrace/core/verdict.py`. short version: a failed gate means inconclusive. an interval on the wrong side of its threshold means falsified. an untested invariance means inconclusive. a valid attack that changes a decision means challenged.
 
-some limits. one task family, mlp blocks only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b, perplexity up to 1.4b, and the bias survey reads pythia up to 12b and 23 other checkpoints up to 20b without running them. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
+some limits. two task families, mlp blocks and the residual stream only, small models. the claim cards use two, the bf16 audit goes up to pythia-1b, perplexity up to 1.4b, and the bias survey reads pythia up to 12b and 23 other checkpoints up to 20b without running them. attention heads, where this task actually lives, come next. the windows pytorch wheel ships without flash attention, so that kernel shows up as not run on windows. and none of this says anything about model safety.
 
 mit license.
