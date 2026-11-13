@@ -65,3 +65,15 @@ shared offset, up to about 360 at position 511, where bf16 steps by 2.
 
 16. bloom-560m: writing the alibi as slope * (key - query), which is exact in fp32, brings bf16
     wikitext perplexity from +13.4% to within 2% of fp32.
+
+
+added 13 nov, after the floor runs, before this one. baligar found that transformers' gpt-neox softmax,
+which casts scores to fp32 even in an fp64 model, "dominates interaction measurement" in nominal fp64.
+that cast should only cost much when the scores carry a large shared offset. scripts/fp64_softmax_cast.py
+runs pythia-410m-deduped and pythia-410m in fp64 with the stock fp32 softmax (rotary kept in fp64), on
+the same 560 pairs, against the true fp64 runs already on disk.
+
+17. pythia-410m-deduped: the median |q| error from the fp32 softmax cast alone is within 3x of its full
+    fp32 floor (3.0e-4).
+18. with the invariant key bias dropped, that error falls at least 10x on both models.
+19. pythia-410m-deduped's largest attention score offset on these ioi prompts is over 10,000.
