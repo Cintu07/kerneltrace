@@ -88,3 +88,11 @@ attention).
 
 20. under sdpa, pythia-160m and pythia-410m's bf16 median sweep error is at least half its eager value.
 21. under sdpa, dropping the key bias brings pythia-410m's bf16 median sweep error under 0.02.
+
+
+added 13 nov, before these runs. the controlled training experiment used one seed. scripts/key_bias_training.py
+--seed 1 and --seed 2 rerun fp32 adam, fp16 adam, bf16 adam and fp16 adam with fp32 attention with a different
+model init and data order.
+
+22. in both new seeds, the fp16 and bf16 invariant parts at step 3,000 are each at least 10x that seed's fp32 run.
+23. in both new seeds, fp16 with attention in fp32 ends within 2x of that seed's fp32 run.

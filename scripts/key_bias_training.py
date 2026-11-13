@@ -9,6 +9,7 @@ predictions: experiments/key_bias_training_prediction.txt (committed before the 
 
 usage: python scripts/key_bias_training.py [run ...]
 writes evidence/key_bias_training/<run>.json and summary.json
+--seed N reruns with another seed (model init and data order), into evidence/key_bias_training/seed<N>/
 """
 from __future__ import annotations
 
@@ -183,6 +184,13 @@ def train(name: str, train_ids: torch.Tensor, val_ids: torch.Tensor, vocab: int)
 
 
 def main(names):
+    global OUT
+    if "--seed" in names:
+        i = names.index("--seed")
+        TRAIN["seed"] = int(names[i + 1])
+        names = names[:i] + names[i + 2:]
+        OUT = OUT / f"seed{TRAIN['seed']}"
+    names = names or list(RUNS)
     OUT.mkdir(parents=True, exist_ok=True)
     tok = load_tokenizer(*TOKENIZER)
     train_ids, val_ids = tokens("train", tok), tokens("test", tok)
@@ -196,4 +204,4 @@ def main(names):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or list(RUNS))
+    main(sys.argv[1:])
