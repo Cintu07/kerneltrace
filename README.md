@@ -90,7 +90,7 @@ baligar (2026, computation 14(9):212) measured pair interactions, q = f11 - f10 
 
 ![the interaction floor](docs/figures/x_patching_floor.png)
 
-the floor (median |q32 - q64|) on pythia-410m-deduped is 3.0e-4 as released and 9.7e-6 with the bias dropped, 31 times lower. on pythia-410m it goes from 1.7e-4 to 3.3e-6, 52 times. gpt-2 medium, whose invariant part is 2.6 per head, sits at 9.2e-6 both ways. so with the bias gone the two pythias land at or under gpt-2 medium, and the 10x gap is the bias. in fp64 the two versions of each model agree to 1e-11, so nothing about the model changed, only the rounding.
+the floor (median |q32 - q64|) on pythia-410m-deduped is 3.0e-4 as released and 9.7e-6 with the bias dropped, 31 times lower. on pythia-410m it goes from 1.7e-4 to 3.3e-6, 52 times. gpt-2 medium, whose invariant part is 2.6 per head, sits at 9.2e-6 both ways. so on these prompts, with the bias gone, the two pythias land at or under gpt-2 medium. i haven't rerun baligar's own prompts, so that gap is likely the bias and not proven to be. in fp64 the two versions of each model agree to 1e-11, so nothing about the model changed, only the rounding.
 
 baligar also found that transformers' gpt-neox softmax, which casts scores to fp32 even in an fp64 model, dominates the error of nominal fp64 runs. that cast only costs much when the scores carry a big offset, and they do: on these prompts pythia-410m-deduped's largest score offset is 55,579 against a spread of 17 between keys. `scripts/fp64_softmax_cast.py` runs fp64 with only the stock softmax. the cast alone gives an interaction error of 1.1e-4 on 410m-deduped, over a third of its whole fp32 floor. with the bias dropped it falls 44 times, and 235 times on pythia-410m.
 
