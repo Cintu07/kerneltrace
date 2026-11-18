@@ -96,3 +96,33 @@ model init and data order.
 
 22. in both new seeds, the fp16 and bf16 invariant parts at step 3,000 are each at least 10x that seed's fp32 run.
 23. in both new seeds, fp16 with attention in fp32 ends within 2x of that seed's fp32 run.
+
+
+added 18 nov, before these runs. three more experiments.
+
+baligar's own fixture (scripts/baligar_fixture.py). his six cloze templates, his names, seed 0, 20 prompts,
+8 residual sites, the 7 displacements from 0.05 to 1, his model revisions and his floor: median |q32 - q64|
+pooled over the ladder. his fp64 reference patches only the softmax, so mine does too. his deposited data gives
+floors of 1.25e-4 (pythia-410m-deduped) and 1.2e-5 (gpt-2-medium), and 51.2% and 13.0% of full-displacement
+pairs under 3x the floor.
+
+24. as released, my fp32 floors land within 2x of his on both models.
+25. pythia-410m-deduped: dropping the invariant key bias lowers the floor at least 3x.
+26. after the drop, pythia-410m-deduped's floor is within 2x of gpt-2-medium's as-released floor.
+27. gpt-2-medium: dropping its bias moves the floor by less than 1.5x either way.
+28. pythia-410m-deduped: the share of full-displacement pairs under 3x the floor falls from about 51% to under 25%.
+29. pythia-410m-deduped: the error from the stock fp32 softmax alone falls at least 10x with the drop.
+
+attention heads (scripts/head_patching.py). ioi, 48 prompts, every head of gpt-2 small, pythia-160m, -410m and
+-1b patched one at a time. top 5 means the five heads with the largest mean absolute restoration in fp32.
+
+30. pythia-410m: bf16 keeps at most 3 of fp32's top 5 heads, and bf16 with the bias dropped and an fp32 head keeps
+    at least 4.
+31. pythia-160m: the median head error in bf16 is at least 3x the error with the bias dropped and an fp32 head.
+32. pythia-1b and gpt-2 small: bf16 keeps at least 4 of fp32's top 5 heads.
+
+a ten times longer training run (scripts/key_bias_training.py --steps 30000), same model, seed 0.
+
+33. at 30,000 steps the invariant part is at least 3x its 3,000-step value in both fp16 (0.34) and bf16 (0.50).
+34. fp32, and fp16 with attention in fp32, both end under 0.1.
+35. in fp16 the invariant part still ends below the rotary part.
